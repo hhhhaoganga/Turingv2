@@ -1,7 +1,7 @@
 #include "mainwindow.h"
-#include "ui_mainwindow.h"
 #include "engine.h"
 #include "graphics.h"
+#include "ui_mainwindow.h"
 
 /**
  * @file mainwindow.cpp
@@ -11,7 +11,8 @@
 
 // 目的: 构造主窗口，完成所有模块的初始化和“粘合”工作。
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent), ui(new Ui::MainWindow)
+    : QMainWindow(parent)
+    , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
 
@@ -46,13 +47,45 @@ void MainWindow::on_actionAdd_Input_triggered()
     m_scene->setComponentTypeToAdd(ComponentType::Input);
     m_scene->setMode(GraphicsScene::Mode::AddingComponent);
 }
-void MainWindow::on_actionAdd_Output_triggered() { m_scene->setComponentTypeToAdd(ComponentType::Output); m_scene->setMode(GraphicsScene::AddingComponent); }
-void MainWindow::on_actionAdd_AndGate_triggered() { m_scene->setComponentTypeToAdd(ComponentType::And); m_scene->setMode(GraphicsScene::AddingComponent); }
-void MainWindow::on_actionAdd_OrGate_triggered() { m_scene->setComponentTypeToAdd(ComponentType::Or); m_scene->setMode(GraphicsScene::AddingComponent); }
-void MainWindow::on_actionAdd_NotGate_triggered() { m_scene->setComponentTypeToAdd(ComponentType::Not); m_scene->setMode(GraphicsScene::AddingComponent); }
-void MainWindow::on_actionAdd_NandGate_triggered() { m_scene->setComponentTypeToAdd(ComponentType::Nand); m_scene->setMode(GraphicsScene::AddingComponent); }
-void MainWindow::on_actionAdd_NorGate_triggered() { m_scene->setComponentTypeToAdd(ComponentType::Nor); m_scene->setMode(GraphicsScene::AddingComponent); }
-void MainWindow::on_actionAdd_XorGate_triggered() { m_scene->setComponentTypeToAdd(ComponentType::Xor); m_scene->setMode(GraphicsScene::AddingComponent); }
-void MainWindow::on_actionAdd_XnorGate_triggered() { m_scene->setComponentTypeToAdd(ComponentType::Xnor); m_scene->setMode(GraphicsScene::AddingComponent); }
+void MainWindow::on_actionAdd_Output_triggered()
+{
+    m_scene->setComponentTypeToAdd(ComponentType::Output);
+    m_scene->setMode(GraphicsScene::AddingComponent);
+}
+void MainWindow::on_actionAdd_AndGate_triggered()
+{
+    m_scene->setComponentTypeToAdd(ComponentType::And);
+    m_scene->setMode(GraphicsScene::AddingComponent);
+}
+void MainWindow::on_actionAdd_OrGate_triggered()
+{
+    m_scene->setComponentTypeToAdd(ComponentType::Or);
+    m_scene->setMode(GraphicsScene::AddingComponent);
+}
+void MainWindow::on_actionAdd_NotGate_triggered()
+{
+    m_scene->setComponentTypeToAdd(ComponentType::Not);
+    m_scene->setMode(GraphicsScene::AddingComponent);
+}
+void MainWindow::on_actionAdd_NandGate_triggered()
+{
+    m_scene->setComponentTypeToAdd(ComponentType::Nand);
+    m_scene->setMode(GraphicsScene::AddingComponent);
+}
+void MainWindow::on_actionAdd_NorGate_triggered()
+{
+    m_scene->setComponentTypeToAdd(ComponentType::Nor);
+    m_scene->setMode(GraphicsScene::AddingComponent);
+}
+void MainWindow::on_actionAdd_XorGate_triggered()
+{
+    m_scene->setComponentTypeToAdd(ComponentType::Xor);
+    m_scene->setMode(GraphicsScene::AddingComponent);
+}
+void MainWindow::on_actionAdd_XnorGate_triggered()
+{
+    m_scene->setComponentTypeToAdd(ComponentType::Xnor);
+    m_scene->setMode(GraphicsScene::AddingComponent);
+}
 
 // C同学将在这里填充 on_actionSave_triggered 等其他功能的槽函数实现
