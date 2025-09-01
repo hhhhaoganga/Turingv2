@@ -1,7 +1,8 @@
 #include "mainwindow.h"
-#include "ui_mainwindow.h"
 #include "engine.h"
 #include "graphics.h"
+#include "ui_mainwindow.h"
+#include <QActionGroup>
 
 /**
  * @file mainwindow.cpp
@@ -11,7 +12,8 @@
 
 // 目的: 构造主窗口，完成所有模块的初始化和“粘合”工作。
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent), ui(new Ui::MainWindow)
+    : QMainWindow(parent)
+    , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
 
@@ -22,6 +24,20 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 3. 将B同学的画布“安装”到UI界面上
     ui->graphicsView->setScene(m_scene);
+    //4.
+    m_addComponentActionGroup = new QActionGroup(this);
+    m_addComponentActionGroup->addAction(ui->actionAdd_Input);
+    m_addComponentActionGroup->addAction(ui->actionAdd_Output);
+    m_addComponentActionGroup->addAction(ui->actionAdd_AndGate);
+    m_addComponentActionGroup->addAction(ui->actionAdd_OrGate);
+    m_addComponentActionGroup->addAction(ui->actionAdd_NotGate);
+    m_addComponentActionGroup->addAction(ui->actionAdd_NandGate);
+    m_addComponentActionGroup->addAction(ui->actionAdd_NorGate);
+    m_addComponentActionGroup->addAction(ui->actionAdd_XorGate);
+    m_addComponentActionGroup->addAction(ui->actionAdd_XnorGate);
+    m_addComponentActionGroup->setExclusive(true);
+    connect(m_scene, &GraphicsScene::componentAdded, this, &MainWindow::onComponentPlaced);
+
 }
 
 // 目的: 销毁主窗口时，清理我们手动创建的对象，防止内存泄漏。
@@ -46,13 +62,68 @@ void MainWindow::on_actionAdd_Input_triggered()
     m_scene->setComponentTypeToAdd(ComponentType::Input);
     m_scene->setMode(GraphicsScene::Mode::AddingComponent);
 }
-void MainWindow::on_actionAdd_Output_triggered() { m_scene->setComponentTypeToAdd(ComponentType::Output); m_scene->setMode(GraphicsScene::AddingComponent); }
-void MainWindow::on_actionAdd_AndGate_triggered() { m_scene->setComponentTypeToAdd(ComponentType::And); m_scene->setMode(GraphicsScene::AddingComponent); }
-void MainWindow::on_actionAdd_OrGate_triggered() { m_scene->setComponentTypeToAdd(ComponentType::Or); m_scene->setMode(GraphicsScene::AddingComponent); }
-void MainWindow::on_actionAdd_NotGate_triggered() { m_scene->setComponentTypeToAdd(ComponentType::Not); m_scene->setMode(GraphicsScene::AddingComponent); }
-void MainWindow::on_actionAdd_NandGate_triggered() { m_scene->setComponentTypeToAdd(ComponentType::Nand); m_scene->setMode(GraphicsScene::AddingComponent); }
-void MainWindow::on_actionAdd_NorGate_triggered() { m_scene->setComponentTypeToAdd(ComponentType::Nor); m_scene->setMode(GraphicsScene::AddingComponent); }
-void MainWindow::on_actionAdd_XorGate_triggered() { m_scene->setComponentTypeToAdd(ComponentType::Xor); m_scene->setMode(GraphicsScene::AddingComponent); }
-void MainWindow::on_actionAdd_XnorGate_triggered() { m_scene->setComponentTypeToAdd(ComponentType::Xnor); m_scene->setMode(GraphicsScene::AddingComponent); }
+void MainWindow::on_actionAdd_Output_triggered()
+{
+    m_scene->setComponentTypeToAdd(ComponentType::Output);
+    m_scene->setMode(GraphicsScene::AddingComponent);
+}
+void MainWindow::on_actionAdd_AndGate_triggered()
+{
+    m_scene->setComponentTypeToAdd(ComponentType::And);
+    m_scene->setMode(GraphicsScene::AddingComponent);
+}
+void MainWindow::on_actionAdd_OrGate_triggered()
+{
+    m_scene->setComponentTypeToAdd(ComponentType::Or);
+    m_scene->setMode(GraphicsScene::AddingComponent);
+}
+void MainWindow::on_actionAdd_NotGate_triggered()
+{
+    m_scene->setComponentTypeToAdd(ComponentType::Not);
+    m_scene->setMode(GraphicsScene::AddingComponent);
+}
+void MainWindow::on_actionAdd_NandGate_triggered()
+{
+    m_scene->setComponentTypeToAdd(ComponentType::Nand);
+    m_scene->setMode(GraphicsScene::AddingComponent);
+}
+void MainWindow::on_actionAdd_NorGate_triggered()
+{
+    m_scene->setComponentTypeToAdd(ComponentType::Nor);
+    m_scene->setMode(GraphicsScene::AddingComponent);
+}
+void MainWindow::on_actionAdd_XorGate_triggered()
+{
+    m_scene->setComponentTypeToAdd(ComponentType::Xor);
+    m_scene->setMode(GraphicsScene::AddingComponent);
+}
+void MainWindow::on_actionAdd_XnorGate_triggered()
+{
+    m_scene->setComponentTypeToAdd(ComponentType::Xnor);
+    m_scene->setMode(GraphicsScene::AddingComponent);
+}
+// void MainWindow::on_actionClear_triggered(){
+//     if (m_engine) {
+//         m_engine->clearAll();
+//     }
+//     if(m_scene){
+//         m_scene->clear();
+//     }
+// }
+
+void MainWindow::onComponentPlaced()
+{
+    // 检查当前是否有被按下的(checked)动作
+    QAction* checked_action = m_addComponentActionGroup->checkedAction();
+    if (checked_action) {
+        // 如果有，就取消它的选中状态。
+        // 关键：第二个参数 false 表示“不要触发此Action的信号”，
+        // 避免了可能产生的逻辑循环。
+        checked_action->setChecked(false);
+    }
+
+    // 将状态栏恢复到“准备就绪”
+    ui->statusbar->showMessage("准备就绪");
+}
 
 // C同学将在这里填充 on_actionSave_triggered 等其他功能的槽函数实现

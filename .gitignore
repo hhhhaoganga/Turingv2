@@ -1,83 +1,67 @@
 # This file is used to ignore files which are generated
+# by the build process or user-specific settings.
 # ----------------------------------------------------------------------------
 
+# General editor/OS files
 *~
 *.autosave
-*.a
-*.core
-*.moc
-*.o
-*.obj
-*.orig
-*.rej
-*.so
-*.so.*
-*_pch.h.cpp
-*_resource.rc
-*.qm
+*.DS_Store
+*.swp
 .#*
 *.*#
-core
-!core/
-tags
-.DS_Store
-.directory
-*.debug
-Makefile*
-*.prl
-*.app
-moc_*.cpp
-ui_*.h
-qrc_*.cpp
 Thumbs.db
-*.res
-*.rc
-/.qmake.cache
-/.qmake.stash
 
-# qtcreator generated files
+# Qt build system files
+Makefile*
 *.pro.user*
 *.qbs.user*
 CMakeLists.txt.user*
+/.qmake.cache
+/.qmake.stash
 
-# xemacs temporary files
-*.flc
+# Qt generated files (moc, uic, rcc)
+*.moc
+moc_*.cpp
+ui_*.h
+qrc_*.cpp
+*_pch.h.cpp
+*_resource.rc
 
-# Vim temporary files
-.*.swp
-
-# Visual Studio generated files
-*.ib_pdb_index
-*.idb
-*.ilk
-*.pdb
-*.sln
-*.suo
-*.vcproj
-*vcproj.*.*.user
-*.ncb
-*.sdf
-*.opensdf
-*.vcxproj
-*vcxproj.*
-
-# MinGW generated files
-*.Debug
-*.Release
-
-# Python byte code
-*.pyc
-
-# Binaries
-# --------
+# Compiled object files and libraries
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
 *.dll
-*.exe
 
-# Directories with generated files
+# Executable files
+*.exe
+*.app
+
+# Debug and release info
+*.d
+*.pdb
+*.ilk
+*.idb
+*.gch
+
+# Build directories
+# This is the most important one for out-of-source builds.
+# It ignores any directory starting with "build".
+/build*/
+
+# Shadow build directories (older Qt Creator style)
 .moc/
 .obj/
 .pch/
 .rcc/
 .uic/
-/build*/
-build-*/
+
+# Other generated files
+*.core
+*.qm
+*.prl
+*.rej
+*.orig

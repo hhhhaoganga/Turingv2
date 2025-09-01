@@ -1,5 +1,6 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
+#include <QMainWindow>
 /**
  * @file mainwindow.h
  * @brief 【C同学负责】定义了应用程序的主窗口类。
@@ -12,9 +13,12 @@
 // --- 前向声明 ---
 class Engine;
 class GraphicsScene;
+class QActionGroup;
 
 QT_BEGIN_NAMESPACE
-namespace Ui { class MainWindow; }
+namespace Ui {
+class MainWindow;
+}
 QT_END_NAMESPACE
 
 class MainWindow : public QMainWindow
@@ -35,11 +39,14 @@ private slots:
     void on_actionAdd_NorGate_triggered();
     void on_actionAdd_XorGate_triggered();
     void on_actionAdd_XnorGate_triggered();
+    //void on_actionClear_triggered();
+     void onComponentPlaced();
     // ... 其他功能按钮的槽函数声明 ...
 
 private:
     Ui::MainWindow *ui;
-    Engine* m_engine;
-    GraphicsScene* m_scene;
+    Engine *m_engine;
+    GraphicsScene *m_scene;
+    QActionGroup *m_addComponentActionGroup;
 };
 #endif // MAINWINDOW_H
