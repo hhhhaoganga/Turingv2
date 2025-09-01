@@ -25,7 +25,8 @@ public:
     ~ComponentItem();
     QRectF boundingRect() const override;
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
-    virtual QPointF getPinScenePosition(Pin::PinType pinType, int index) const;//根据B同学的说法加入了这行代码
+    virtual QPointF getPinScenePosition(Pin::PinType pinType, int index) const;//
+    Component* component() const { return m_data; }
 private:
     Component* m_data;
 };
@@ -58,14 +59,22 @@ public:
      *               【合法值】: 必须是 engine.h 中定义的 ComponentType 枚举里的一个值。
      */
     void setComponentTypeToAdd(ComponentType type);
-
+signals:
+    void componentAdded(); // C同学要求的新信号
 protected:
     void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
+    void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override;
+    void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;
     // ... 其他事件声明 ...
 private:
     Engine* m_engine; // 指向A同学引擎的“遥控器”
     Mode m_currentMode;
     ComponentType m_typeToAdd;
+
+    Pin* findPinAt(const QPointF& scenePos) const;// 为画线提供的位置接口
+
+    Pin* m_startPin;// 记住所选的起点引脚
+    QGraphicsLineItem* m_tempLine;// 用于显示正在绘制的临时导线
 };
 
 #endif // GRAPHICS_H
