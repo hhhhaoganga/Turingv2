@@ -14,7 +14,7 @@
 // --- 前向声明 ---
 class Component;
 class Engine;
-
+class WireItem;
 // =============================================================
 // == 类: ComponentItem
 // == 目的: 任何电路元件在画布上的图形表示。
@@ -27,8 +27,10 @@ public:
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
     virtual QPointF getPinScenePosition(Pin::PinType pinType, int index) const;//
     Component* component() const { return m_data; }
+
 private:
     Component* m_data;
+
 };
 
 // =============================================================
@@ -76,5 +78,18 @@ private:
     Pin* m_startPin;// 记住所选的起点引脚
     QGraphicsLineItem* m_tempLine;// 用于显示正在绘制的临时导线
 };
-
+// =============================================================
+// == 类: WireItem (全新)
+// == 目的: 导线在画布上的图形表示。
+// =============================================================
+class WireItem : public QGraphicsLineItem
+{
+public:
+    WireItem(Wire* data); // 参数是后台 Wire 数据
+    void updatePosition();
+    // 我们可以添加一个函数来获取后台数据，这对于删除操作很有用
+    Wire* wireData() const { return m_wireData; }
+private:
+    Wire* m_wireData;
+};
 #endif // GRAPHICS_H

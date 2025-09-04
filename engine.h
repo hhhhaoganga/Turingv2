@@ -47,6 +47,7 @@ public:
     Component* owner() const;
     int index() const;
     QPointF getScenePos() const;
+    PinType type() const { return m_type; }//额外添加
 private:
     Component* m_owner;
     PinType m_type;

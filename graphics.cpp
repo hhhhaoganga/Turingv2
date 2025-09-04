@@ -2,6 +2,7 @@
 #include "engine.h"
 #include <QPainter>
 #include <QGraphicsSceneMouseEvent>
+#include <QDebug>
 //测试
 /**
  * @file graphics.cpp
@@ -103,7 +104,6 @@ void ComponentItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opt
         }
     }
 }
-
 
 // === GraphicsScene 实现 ===
 GraphicsScene::GraphicsScene(Engine* engine, QObject* parent)
@@ -230,22 +230,19 @@ Pin* GraphicsScene::findPinAt(const QPointF& scenePos) const
 }
 
 // in graphics.cpp
-
-void GraphicsScene::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
-{
-    // 只有当我们已经通过 mousePressEvent 进入“画线模式”时，才执行操作
-    // (m_startPin 不为 nullptr 是我们进入画线模式的标志)
-    if (m_startPin && m_tempLine) {
-        // 1. 获取我们正在画的那根临时虚线
-        QLineF line = m_tempLine->line();
-        // 2. 保持起点不变，只更新它的终点为当前鼠标的场景坐标
-        line.setP2(event->scenePos());
-        // 3. 将更新后的线段设置回 m_tempLine，Qt会自动重绘它
-        m_tempLine->setLine(line);
+// in graphics.cpp
+void GraphicsScene::mouseMoveEvent(QGraphicsSceneMouseEvent *event) {
+    if (m_tempLine) {
+        m_tempLine->setLine(QLineF(m_tempLine->line().p1(), event->scenePos()));
     } else {
-        // 如果我们不在画线模式，就执行Qt默认的鼠标移动行为
-        // (这很重要，否则你将无法拖动元件！)
+        // 先让元件移动
         QGraphicsScene::mouseMoveEvent(event);
+        // 然后强制所有导线更新
+        for(QGraphicsItem* item : items()){
+            if(auto wireItem = qgraphicsitem_cast<WireItem*>(item)){
+                wireItem->updatePosition();
+            }
+        }
     }
 }
 
@@ -253,40 +250,42 @@ void GraphicsScene::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 
 void GraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
-    // 同样，只在“画线模式”下执行我们的特殊逻辑
     if (m_startPin && m_tempLine) {
-        // 1. 收尾工作第一步：先把那根碍眼的临时虚线从场景中移除并销毁
         removeItem(m_tempLine);
         delete m_tempLine;
-        m_tempLine = nullptr; // 清理指针，避免野指针
+        m_tempLine = nullptr;
 
-        // 2. 用我们的“引脚侦测器”看看鼠标是在哪里松开的
         Pin* endPin = findPinAt(event->scenePos());
 
-        // 3. 最核心的判断逻辑：检查连接是否合法
-        if (endPin &&                                     // 必须在一个引脚上松开
-            endPin->owner() != m_startPin->owner() &&    // 不能是同一个元件
-            endPin->type() != m_startPin->type()) {      // 类型必须不同 (一个Input, 一个Output)
-
-            // 连接有效！确定哪个是输出，哪个是输入。
-            Pin* outputPin = (m_startPin->type() == Pin::Output) ? m_startPin : endPin;
-            Pin* inputPin  = (m_startPin->type() == Pin::Input)  ? m_startPin : endPin;
-
-            // 4. 【协作点】通知A同学的引擎在后台创建真正的导线
-            // 注意：A同学还没有实现 createWire 函数，所以我们先用打印来模拟
-            // 当A同学完成后，我们会取消这行注释
-            // m_engine->createWire(outputPin, inputPin);
-
-            // 打印调试信息，确认连接成功
-            qDebug() << "连接成功! From Pin" << outputPin->index()
-                     << " -> To Pin" << inputPin->index();
+        if (endPin && endPin->owner() != m_startPin->owner() && endPin->type() != m_startPin->type()) {
+            Wire* newWireData = m_engine->createWire(outputPin, inputPin);
+            if(newWireData){
+                // 创建前台 WireItem
+                WireItem* wireItem = new WireItem(newWireData);
+                addItem(wireItem);
+                // 创建后立刻更新一次
+                wireItem->updatePosition();
+            }
         }
-
-        // 5. 收尾工作第二步：无论连接是否成功，都必须重置起点引脚，退出“画线模式”
         m_startPin = nullptr;
-
     } else {
-        // 如果不在画线模式，执行Qt默认的鼠标释放行为
         QGraphicsScene::mouseReleaseEvent(event);
+    }
+}
+
+
+// in graphics.cpp (at the end of file)
+WireItem::WireItem(Wire* data) : m_wireData(data)
+{
+    setPen(QPen(Qt::black, 2));
+    setZValue(-1);
+}
+
+void WireItem::updatePosition()
+{
+    // 这个逻辑和你成熟版本里的完全一样
+    if (m_wireData) {
+        // 【协作点】这里需要 A 同学实现 Wire 类和 getScenePos
+        setLine(QLineF(m_wireData->startPin()->getScenePos(), m_wireData->endPin()->getScenePos()));
     }
 }
