@@ -1,95 +1,71 @@
 #ifndef GRAPHICS_H
 #define GRAPHICS_H
 
-/**
- * @file graphics.h
- * @brief 【B同学负责】定义项目的所有图形和交互相关的类。
- * @details 定义了元件在画布上的“图形化身”，以及处理所有用户鼠标操作的“画布”类。
- */
-
 #include <QGraphicsScene>
 #include <QGraphicsItem>
-#include "engine.h" // 需要包含engine.h来使用公共枚举ComponentType
+#include <QGraphicsLineItem> // 确保包含
+#include "engine.h"
 
 // --- 前向声明 ---
-class Component;
-class Engine;
+class Wire;
 class WireItem;
+
 // =============================================================
 // == 类: ComponentItem
-// == 目的: 任何电路元件在画布上的图形表示。
 // =============================================================
 class ComponentItem : public QGraphicsItem {
 public:
     ComponentItem(Component* data);
-    ~ComponentItem();
     QRectF boundingRect() const override;
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
-    virtual QPointF getPinScenePosition(Pin::PinType pinType, int index) const;//
-    Component* component() const { return m_data; }
-
+    Component* component() const;
+    Pin* getPinAt(const QPointF& localPos);
+protected:
+    QVariant itemChange(GraphicsItemChange change, const QVariant &value) override;
 private:
-    Component* m_data;
-
+    Component* m_componentData;
 };
 
 // =============================================================
-// == 类: GraphicsScene
-// == 目的: 整个项目的交互核心，用户的“画布”。
+// == 类: WireItem
+// =============================================================
+class WireItem : public QGraphicsLineItem {
+public:
+    WireItem(Wire* data);
+    void updatePosition();
+    Wire* wireData() const;
+    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
+private:
+    Wire* m_wireData;
+};
+
+// =============================================================
+// == 类: GraphicsScene (精确修正以兼容C同学)
 // =============================================================
 class GraphicsScene : public QGraphicsScene {
     Q_OBJECT
 public:
+    // 【修正】使用我们最初的枚举名
     enum Mode { Idle, AddingComponent };
 
-    /**
-     * @brief 构造函数。
-     * @param engine - 【输入】一个指向后台引擎的指针，用于命令引擎进行数据操作。
-     * @param parent - 【输入】父对象。
-     */
     GraphicsScene(Engine* engine, QObject* parent = nullptr);
 
-    /**
-     * @brief 设置场景的当前操作模式。由C同学的MainWindow调用。
-     * @param mode - 【输入】要切换到的模式 (Idle或AddingComponent)。
-     */
+    // 【核心修正】恢复为两个独立的函数，以匹配 mainwindow.cpp 的调用
     void setMode(Mode mode);
-
-    /**
-     * @brief 告知场景接下来要添加的元件类型。由C同学的MainWindow调用。
-     * @param type - 【输入】要添加的元件类型。
-     *               【合法值】: 必须是 engine.h 中定义的 ComponentType 枚举里的一个值。
-     */
     void setComponentTypeToAdd(ComponentType type);
-signals:
-    void componentAdded(); // C同学要求的新信号
+
 protected:
     void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
     void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override;
     void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;
-    // ... 其他事件声明 ...
 private:
-    Engine* m_engine; // 指向A同学引擎的“遥控器”
+    Engine* m_engine;
+    QGraphicsLineItem* m_tempLine;
+    Pin* m_startPin;
+
+    // 【修正】恢复为我们最初的成员变量
     Mode m_currentMode;
     ComponentType m_typeToAdd;
-
-    Pin* findPinAt(const QPointF& scenePos) const;// 为画线提供的位置接口
-
-    Pin* m_startPin;// 记住所选的起点引脚
-    QGraphicsLineItem* m_tempLine;// 用于显示正在绘制的临时导线
 };
-// =============================================================
-// == 类: WireItem (全新)
-// == 目的: 导线在画布上的图形表示。
-// =============================================================
-class WireItem : public QGraphicsLineItem
-{
-public:
-    WireItem(Wire* data); // 参数是后台 Wire 数据
-    void updatePosition();
-    // 我们可以添加一个函数来获取后台数据，这对于删除操作很有用
-    Wire* wireData() const { return m_wireData; }
-private:
-    Wire* m_wireData;
-};
+
 #endif // GRAPHICS_H
