@@ -47,13 +47,14 @@ class GraphicsScene : public QGraphicsScene {
 public:
     // 【修正】使用我们最初的枚举名
     enum Mode { Idle, AddingComponent };
-
+    void rebuildSceneFromEngine();
     GraphicsScene(Engine* engine, QObject* parent = nullptr);
 
     // 【核心修正】恢复为两个独立的函数，以匹配 mainwindow.cpp 的调用
     void setMode(Mode mode);
     void setComponentTypeToAdd(ComponentType type);
-
+signals:
+    void componentAdded();
 protected:
     void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
     void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override;

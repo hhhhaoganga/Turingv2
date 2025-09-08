@@ -31,9 +31,16 @@ void ComponentItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opt
 
     // 绘制选中状态
     if (option->state & QStyle::State_Selected) {
-        painter->setPen(QPen(QColor("#66ccff"), 2.5, Qt::DashLine));
-        painter->setBrush(Qt::NoBrush);
-        painter->drawRoundedRect(bodyRect, 5, 5);
+        // 循环画5层，每一层都更粗、更透明
+        for (int i = 0; i < 5; ++i) {
+            QColor glowColor = QColor("#66ccff");
+            // 透明度从 80 递减到 0
+            glowColor.setAlpha(80 - i * 16);
+
+            painter->setPen(QPen(glowColor, i * 2)); // 画笔越来越粗
+            painter->setBrush(Qt::NoBrush);
+            painter->drawRoundedRect(bodyRect, 5, 5);
+        }
     }
 
     // 准备文字和状态
@@ -49,14 +56,14 @@ void ComponentItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opt
             state = m_componentData->outputPins()[0]->getState();
             painter->setBrush(state ? QColor("#4CAF50") : QColor("#F44336"));
             painter->setPen(Qt::NoPen);
-            painter->drawRect(50, 0, 50, 50);
+            painter->drawRect(0, 0, 50, 50);
             painter->setPen(Qt::white);
             painter->setFont(QFont("Arial", 10, QFont::Bold));
-            painter->drawText(QRectF(50,0,50,50), Qt::AlignCenter, state ? "ON" : "OFF");
+            painter->drawText(QRectF(0,0,50,50), Qt::AlignCenter, state ? "ON" : "OFF");
             painter->setFont(QFont()); // 恢复
             painter->setPen(Qt::black);
         }
-        painter->drawText(QRectF(0,0,50,50), Qt::AlignCenter, text);
+        painter->drawText(QRectF(50,0,50,50), Qt::AlignCenter, text);
         break;
 
     case ComponentType::Output:
@@ -249,15 +256,20 @@ void GraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
 
     if (m_currentMode == AddingComponent) {
         Component* data = m_engine->createComponent(m_typeToAdd, event->scenePos());
-        if(data) { addItem(new ComponentItem(data)); }
+        if(data) {
+            addItem(new ComponentItem(data));
+            emit componentAdded();
+        }
         setMode(Idle);
+        m_engine->simulate();
+        update();
         return;
     }
 
     ComponentItem* compItem = qgraphicsitem_cast<ComponentItem*>(itemAt(event->scenePos(), QTransform()));
     if (compItem) {
         QPointF localPos = compItem->mapFromScene(event->scenePos());
-        if (compItem->component()->type() == ComponentType::Input && localPos.x() > 50) {
+        if (compItem->component()->type() == ComponentType::Input && localPos.x() < 50) {
             static_cast<Input*>(compItem->component())->toggleState();
             m_engine->simulate();
             update();
@@ -310,4 +322,28 @@ void GraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event) {
         return;
     }
     QGraphicsScene::mouseReleaseEvent(event);
+}
+
+void GraphicsScene::rebuildSceneFromEngine()
+{
+    // 1. 清空当前画布上所有的图形项
+    clear();
+
+    // 2. 遍历引擎后台的所有元件数据
+    for (Component* compData : m_engine->getAllComponents().values()) {
+        // 为每一个后台元件，创建一个新的前台图形项
+        ComponentItem* item = new ComponentItem(compData);
+        addItem(item);
+    }
+
+    // 3. 遍历引擎后台的所有导线数据
+    for (Wire* wireData : m_engine->getAllWires()) {
+        // 为每一条后台导线，创建一个新的前台图形项
+        WireItem* item = new WireItem(wireData);
+        addItem(item);
+        item->updatePosition(); // 创建后立即更新一次位置
+    }
+
+    // （可选）给出调试信息
+    qDebug() << "前台画布：已根据引擎状态成功重建。";
 }

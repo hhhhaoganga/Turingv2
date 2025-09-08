@@ -1,6 +1,6 @@
 #ifndef ENGINE_H
 #define ENGINE_H
-
+#include <QJsonObject>
 #include <QVector>
 #include <QPointF>
 #include <QMap>
@@ -96,6 +96,8 @@ public:
     const QVector<Wire*>& getAllWires() const;
     void deleteComponent(Component* component);
     void deleteWire(Wire* wire);
+    bool loadCircuitFromJson(const QJsonObject& json);
+    void clearAll();
 private:
     QMap<intptr_t, Component*> m_components;
     QVector<Wire*> m_wires;

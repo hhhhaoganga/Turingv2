@@ -2,6 +2,7 @@
 #include "graphics.h"
 #include <QMessageBox>
 #include <QDebug>
+#include <QJsonObject>
 
 // === Pin 实现 ===
 Pin::Pin(Component* owner, PinType type, int index) : m_owner(owner), m_type(type), m_index(index), m_state(false) {}
@@ -172,3 +173,18 @@ const QMap<intptr_t, Component*>& Engine::getAllComponents() const { return m_co
 const QVector<Wire*>& Engine::getAllWires() const { return m_wires; }
 void Engine::deleteComponent(Component* component) { /* ... */ } // 省略删除逻辑，保持B同学文件独立
 void Engine::deleteWire(Wire* wire) { if (!wire) return; m_wires.removeAll(wire); delete wire; }
+
+bool Engine::loadCircuitFromJson(const QJsonObject& json)
+{
+    // A同学未来在这里实现真正的JSON解析和电路重建逻辑
+    qDebug() << "后台引擎：loadCircuitFromJson 被调用，但尚未实现。";
+    // 暂时总是返回 true，让C同学的流程能跑通
+    return true;
+}
+
+void Engine::clearAll() {
+    qDeleteAll(m_wires);
+    m_wires.clear();
+    qDeleteAll(m_components.values());
+    m_components.clear();
+}
