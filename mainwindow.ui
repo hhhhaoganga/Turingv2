@@ -26,7 +26,7 @@
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>17</height>
+     <height>18</height>
     </rect>
    </property>
   </widget>
@@ -67,6 +67,12 @@
    <addaction name="actionAdd_XnorGate"/>
   </widget>
   <action name="actionSave">
+   <property name="checkable">
+    <bool>false</bool>
+   </property>
+   <property name="enabled">
+    <bool>true</bool>
+   </property>
    <property name="text">
     <string>保存</string>
    </property>
@@ -78,6 +84,9 @@
    </property>
   </action>
   <action name="actionOpen">
+   <property name="checkable">
+    <bool>false</bool>
+   </property>
    <property name="text">
     <string>打开</string>
    </property>
@@ -89,6 +98,9 @@
    </property>
   </action>
   <action name="actionClear">
+   <property name="checkable">
+    <bool>false</bool>
+   </property>
    <property name="text">
     <string>清空</string>
    </property>
@@ -100,6 +112,9 @@
    </property>
   </action>
   <action name="actionEncapsulate">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
    <property name="text">
     <string>封装</string>
    </property>
@@ -112,6 +127,9 @@
    </property>
   </action>
   <action name="actionAdd_Input">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
    <property name="text">
     <string>输入</string>
    </property>
@@ -120,6 +138,9 @@
    </property>
   </action>
   <action name="actionAdd_Output">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
    <property name="text">
     <string>输出</string>
    </property>
@@ -128,6 +149,9 @@
    </property>
   </action>
   <action name="actionAdd_AndGate">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
    <property name="text">
     <string>与门</string>
    </property>
@@ -136,6 +160,9 @@
    </property>
   </action>
   <action name="actionAdd_OrGate">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
    <property name="text">
     <string>或门</string>
    </property>
@@ -144,6 +171,9 @@
    </property>
   </action>
   <action name="actionAdd_NotGate">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
    <property name="text">
     <string>非门</string>
    </property>
@@ -152,6 +182,9 @@
    </property>
   </action>
   <action name="actionAdd_NandGate">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
    <property name="text">
     <string>与非门</string>
    </property>
@@ -160,6 +193,9 @@
    </property>
   </action>
   <action name="actionAdd_NorGate">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
    <property name="text">
     <string>或非门</string>
    </property>
@@ -168,6 +204,9 @@
    </property>
   </action>
   <action name="actionAdd_XorGate">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
    <property name="text">
     <string>异或门</string>
    </property>
@@ -176,6 +215,9 @@
    </property>
   </action>
   <action name="actionAdd_XnorGate">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
    <property name="text">
     <string>同或门</string>
    </property>
