@@ -98,6 +98,7 @@ public:
     void deleteWire(Wire* wire);
     bool loadCircuitFromJson(const QJsonObject& json);
     void clearAll();
+    QJsonObject saveCircuitToJson() const;
 private:
     QMap<intptr_t, Component*> m_components;
     QVector<Wire*> m_wires;

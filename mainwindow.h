@@ -1,6 +1,7 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 #include <QMainWindow>
+#include <QActionGroup>
 /**
  * @file mainwindow.h
  * @brief 【C同学负责】定义了应用程序的主窗口类。
@@ -9,7 +10,7 @@
 
 #include <QMainWindow>
 #include "engine.h" // 需要包含engine.h来使用公共枚举ComponentType
-
+#include "graphics.h"
 // --- 前向声明 ---
 class Engine;
 class GraphicsScene;
@@ -39,7 +40,7 @@ private slots:
     void on_actionAdd_NorGate_triggered();
     void on_actionAdd_XorGate_triggered();
     void on_actionAdd_XnorGate_triggered();
-
+    void on_actionNew_Tab_triggered();
     void on_actionClear_triggered();
     void onComponentPlaced();
     // ... 其他功能按钮的槽函数声明 ...
@@ -49,11 +50,16 @@ private slots:
     void on_actionOpen_triggered();
 
     void on_actionEncapsulate_triggered();
+    void onNewTab();
+    void onTabClose(int index);
 
 private:
     Ui::MainWindow *ui;
-    Engine *m_engine;
-    GraphicsScene *m_scene;
+
     QActionGroup *m_addComponentActionGroup;
+
+
+    GraphicsScene* currentScene();
+    Engine* currentEngine();
 };
 #endif // MAINWINDOW_H

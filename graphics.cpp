@@ -11,7 +11,7 @@
 
 ComponentItem::ComponentItem(Component* data) : m_componentData(data) {
     setPos(data->position());
-    setFlags(ItemIsMovable | ItemIsSelectable);
+    setFlags(ItemIsMovable | ItemIsSelectable | ItemSendsGeometryChanges);
     data->setGraphicsItem(this);
 }
 
@@ -138,7 +138,9 @@ Pin* ComponentItem::getPinAt(const QPointF &localPos) {
 
 QVariant ComponentItem::itemChange(GraphicsItemChange change, const QVariant &value) {
     if (change == ItemPositionHasChanged && m_componentData) {
-        m_componentData->setPosition(this->pos());
+        // 将 this->pos() 改为 value.toPointF()
+        qDebug() << "itemChange called! New position:" << value.toPointF() << "Old position:" << this->pos();
+        m_componentData->setPosition(value.toPointF());
     }
     return QGraphicsItem::itemChange(change, value);
 }
@@ -283,6 +285,7 @@ void GraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
             return;
         }
     }
+
     QGraphicsScene::mousePressEvent(event);
 }
 
