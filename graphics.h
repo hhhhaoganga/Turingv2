@@ -53,6 +53,7 @@ public:
     // 【核心修正】恢复为两个独立的函数，以匹配 mainwindow.cpp 的调用
     void setMode(Mode mode);
     void setComponentTypeToAdd(ComponentType type);
+    Engine* getEngine() const;
 signals:
     void componentAdded();
 protected:
@@ -68,5 +69,7 @@ private:
     Mode m_currentMode;
     ComponentType m_typeToAdd;
 };
-
+inline Engine* GraphicsScene::getEngine() const {
+        return m_engine;
+    }
 #endif // GRAPHICS_H

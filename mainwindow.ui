@@ -16,7 +16,24 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout">
     <item row="0" column="0">
-     <widget class="QGraphicsView" name="graphicsView"/>
+     <widget class="QTabWidget" name="tabWidget">
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
+      <property name="tabsClosable">
+       <bool>true</bool>
+      </property>
+      <widget class="QWidget" name="tab">
+       <attribute name="title">
+        <string>Tab 1</string>
+       </attribute>
+      </widget>
+      <widget class="QWidget" name="tab_2">
+       <attribute name="title">
+        <string>Tab 2</string>
+       </attribute>
+      </widget>
+     </widget>
     </item>
    </layout>
   </widget>
@@ -26,7 +43,7 @@
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>18</height>
+     <height>17</height>
     </rect>
    </property>
   </widget>
@@ -45,6 +62,7 @@
    <addaction name="actionOpen"/>
    <addaction name="actionClear"/>
    <addaction name="actionEncapsulate"/>
+   <addaction name="actionNew_Tab"/>
   </widget>
   <widget class="QToolBar" name="toolBar_2">
    <property name="windowTitle">
@@ -220,6 +238,14 @@
    </property>
    <property name="text">
     <string>同或门</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::NoRole</enum>
+   </property>
+  </action>
+  <action name="actionNew_Tab">
+   <property name="text">
+    <string>新建画布</string>
    </property>
    <property name="menuRole">
     <enum>QAction::MenuRole::NoRole</enum>

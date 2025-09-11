@@ -3,7 +3,7 @@
 #include <QMessageBox>
 #include <QDebug>
 #include <QJsonObject>
-
+#include <QJsonArray>
 // === Pin 实现 ===
 Pin::Pin(Component* owner, PinType type, int index) : m_owner(owner), m_type(type), m_index(index), m_state(false) {}
 bool Pin::getState() const { return m_state; }
@@ -174,17 +174,113 @@ const QVector<Wire*>& Engine::getAllWires() const { return m_wires; }
 void Engine::deleteComponent(Component* component) { /* ... */ } // 省略删除逻辑，保持B同学文件独立
 void Engine::deleteWire(Wire* wire) { if (!wire) return; m_wires.removeAll(wire); delete wire; }
 
+// 在 engine.cpp 文件中
+
 bool Engine::loadCircuitFromJson(const QJsonObject& json)
 {
-    // A同学未来在这里实现真正的JSON解析和电路重建逻辑
-    qDebug() << "后台引擎：loadCircuitFromJson 被调用，但尚未实现。";
-    // 暂时总是返回 true，让C同学的流程能跑通
-    return true;
-}
+    // 关键第一步：在加载新内容前，清空引擎中所有旧的数据
+    clearAll();
 
+    // 检查JSON文件是否包含必须的 "components" 数组
+    if (!json.contains("components") || !json["components"].isArray()) {
+        qWarning("JSON load error: 'components' array not found or is not an array.");
+        return false;
+    }
+
+    // 1. 反序列化所有元件
+    // 这个Map至关重要，它记录了文件中的旧ID到我们新创建的元件内存地址的映射关系
+    QMap<qint64, Component*> idMap;
+    const QJsonArray componentsArray = json["components"].toArray();
+
+    for (const QJsonValue &compValue : componentsArray) {
+        QJsonObject compObject = compValue.toObject();
+        qint64 id = compObject["id"].toInteger();
+        ComponentType type = static_cast<ComponentType>(compObject["type"].toInt());
+        QPointF pos(compObject["x"].toDouble(), compObject["y"].toDouble());
+
+        // 使用我们已有的工厂函数创建新元件
+        Component* newComponent = createComponent(type, pos);
+        if (newComponent) {
+            // 将旧ID和新元件的映射关系存入Map
+            idMap[id] = newComponent;
+        } else {
+            // 如果有任何一个元件创建失败，说明文件有问题，回滚所有操作
+            clearAll();
+            return false;
+        }
+    }
+
+    // 2. 反序列化所有导线
+    if (json.contains("wires") && json["wires"].isArray()) {
+        const QJsonArray wiresArray = json["wires"].toArray();
+        for (const QJsonValue &wireValue : wiresArray) {
+            QJsonObject wireObject = wireValue.toObject();
+            qint64 startCompId = wireObject["start_comp_id"].toInteger();
+            int startPinIndex = wireObject["start_pin_index"].toInt();
+            qint64 endCompId = wireObject["end_comp_id"].toInteger();
+            int endPinIndex = wireObject["end_pin_index"].toInt();
+
+            // 使用idMap，通过旧ID找到我们刚刚创建的新元件
+            Component* startComp = idMap.value(startCompId);
+            Component* endComp = idMap.value(endCompId);
+
+            // 健壮性检查：确保元件和引脚都有效
+            if (!startComp || !endComp || startPinIndex >= startComp->outputPins().size() || endPinIndex >= endComp->inputPins().size()) {
+                clearAll(); // 数据无效，回滚
+                return false;
+            }
+
+            // 创建新的导线并添加到引擎的导线列表中
+            Wire* newWire = new Wire(startComp->outputPins()[startPinIndex], endComp->inputPins()[endPinIndex]);
+            m_wires.append(newWire);
+        }
+    }
+
+    // 加载成功后，运行一次仿真以更新所有引脚的初始状态
+    simulate();
+    return true; // 成功！
+}
 void Engine::clearAll() {
     qDeleteAll(m_wires);
     m_wires.clear();
     qDeleteAll(m_components.values());
     m_components.clear();
+}
+
+QJsonObject Engine::saveCircuitToJson() const
+{
+    QJsonObject circuitJson; // 这是最终要返回的JSON总对象
+    QJsonArray componentsArray; // 用于存放所有元件信息的数组
+    QJsonArray wiresArray;      // 用于存放所有导线信息的数组
+
+    // 1. 遍历所有元件，将它们的信息序列化
+    for (Component* comp : m_components.values()) {
+        QJsonObject compObject;
+        // 使用元件在内存中的地址作为其独一无二的ID
+        compObject["id"] = reinterpret_cast<qint64>(comp);
+        compObject["type"] = static_cast<int>(comp->type());
+        compObject["x"] = comp->position().x();
+        compObject["y"] = comp->position().y();
+
+        componentsArray.append(compObject);
+    }
+
+    // 2. 遍历所有导线，将它们的信息序列化
+    for (Wire* wire : m_wires) {
+        QJsonObject wireObject;
+        // 记录导线连接的起始元件ID和引脚索引
+        wireObject["start_comp_id"] = reinterpret_cast<qint64>(wire->startPin()->owner());
+        wireObject["start_pin_index"] = wire->startPin()->index();
+        // 记录导线连接的终止元件ID和引脚索引
+        wireObject["end_comp_id"] = reinterpret_cast<qint64>(wire->endPin()->owner());
+        wireObject["end_pin_index"] = wire->endPin()->index();
+
+        wiresArray.append(wireObject);
+    }
+
+    // 3. 将元件数组和导线数组放入总对象中
+    circuitJson["components"] = componentsArray;
+    circuitJson["wires"] = wiresArray;
+
+    return circuitJson;
 }
