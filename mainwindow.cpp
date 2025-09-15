@@ -14,7 +14,11 @@
 #include <QToolButton>
 #include <QPainter> // 为了设置 QGraphicsView 的渲染提示
 #include <QGraphicsView>
-
+#include <QInputDialog>
+#include <QDir>
+#include <QMessageBox>
+#include <QToolBar>
+#include <QMenu>
 /**
  * @file mainwindow.cpp
  * @brief 【C同学负责】实现主窗口的所有功能，已升级为多标签页架构。
@@ -49,10 +53,18 @@ MainWindow::MainWindow(QWidget *parent)
     m_addComponentActionGroup->addAction(ui->actionAdd_XnorGate);
     m_addComponentActionGroup->setExclusive(true);
 
+
+
     // 3. 设置TabWidget的功能
+    ui->toolBar_2->setContextMenuPolicy(Qt::CustomContextMenu);
+
+    // 【新增】将右键点击信号连接到我们新创建的槽函数
+    connect(ui->toolBar_2, &QToolBar::customContextMenuRequested,
+            this, &MainWindow::onCustomComponentToolbarContextMenuRequested);
     connect(ui->tabWidget, &QTabWidget::tabCloseRequested, this, &MainWindow::onTabClose);
     connect(ui->tabWidget, &QTabWidget::currentChanged, this, &MainWindow::onComponentPlaced);
-
+    // 程序启动时，扫描元件库并填充到现有工具栏
+    populateCustomComponentToolbar();
     // 4. 启动时自动创建一个空白标签页
     onNewTab();
 }
@@ -349,9 +361,178 @@ void MainWindow::on_actionOpen_triggered()
     }
 }
 
-// ... (其他函数保持不变) ...
-// 封装功能的占位符，将在下一步实现
+
+// in mainwindow.cpp
+
 void MainWindow::on_actionEncapsulate_triggered()
 {
-    QMessageBox::information(this, "待开发", "封装功能将在下一步实现！");
+    Engine* engine = currentEngine();
+    if (!engine || engine->getAllComponents().isEmpty()) {
+        QMessageBox::warning(this, "封装错误", "当前画布是空的，无法封装。");
+        return;
+    }
+
+    // 1. 检查电路是否包含至少一个输入和输出
+    bool hasInput = false, hasOutput = false;
+    for (Component* comp : engine->getAllComponents().values()) {
+        if (comp->type() == ComponentType::Input) hasInput = true;
+        if (comp->type() == ComponentType::Output) hasOutput = true;
+    }
+    if (!hasInput || !hasOutput) {
+        QMessageBox::warning(this, "封装错误", "电路必须至少包含一个输入(Input)和一个输出(Output)元件，才能定义封装后的引脚。");
+        return;
+    }
+
+    // 2. 弹出窗口让用户命名，并使用当前标签页的标题作为默认名
+    QString defaultName = ui->tabWidget->tabText(ui->tabWidget->currentIndex());
+    bool ok;
+    QString componentName = QInputDialog::getText(this, "另存为新元件",
+                                                  "请输入新元件的名称:", QLineEdit::Normal, defaultName, &ok);
+    if (!ok || componentName.isEmpty()) {
+        ui->statusbar->showMessage("操作已取消", 3000);
+        return;
+    }
+
+    // 3. 创建元件库目录 (如果不存在)
+    QString libPath = QCoreApplication::applicationDirPath() + "/components";
+    QDir dir(libPath);
+    if (!dir.exists()) {
+        dir.mkpath(".");
+    }
+
+    // 4. 将当前电路保存为 JSON 文件
+    QString filePath = libPath + "/" + componentName + ".json";
+    QFile saveFile(filePath);
+    if (!saveFile.open(QIODevice::WriteOnly)) {
+        QMessageBox::critical(this, "保存错误", "无法创建元件文件！");
+        return;
+    }
+
+    QJsonObject circuitJson = engine->saveCircuitToJson();
+    saveFile.write(QJsonDocument(circuitJson).toJson());
+    saveFile.close();
+
+    QMessageBox::information(this, "成功", QString("新元件 '%1' 已成功保存！").arg(componentName));
+
+    // 5. 【关键】保存成功后，立即刷新工具栏，新元件按钮就会出现！
+    populateCustomComponentToolbar();
+}
+
+// in mainwindow.cpp
+
+void MainWindow::populateCustomComponentToolbar()
+{
+    // --- 1. 清理旧的自定义按钮 ---
+    QList<QAction*> actionsToRemove;
+    for (QAction *action : ui->toolBar_2->actions()) {
+        // 通过我们设置的自定义属性来识别
+        if (action->property("isCustom").toBool()) {
+            actionsToRemove.append(action);
+        }
+    }
+
+    for (QAction *action : actionsToRemove) {
+        ui->toolBar_2->removeAction(action);
+        m_addComponentActionGroup->removeAction(action);
+        delete action;
+    }
+
+    // --- 2. 扫描文件并重建按钮 ---
+    QString libPath = QCoreApplication::applicationDirPath() + "/components";
+    QDir dir(libPath);
+    if (!dir.exists()) return; // 如果文件夹不存在，就没什么可做的了
+
+    QStringList filters;
+    filters << "*.json";
+    QFileInfoList fileList = dir.entryInfoList(filters, QDir::Files | QDir::NoDotAndDotDot);
+
+    // 如果存在自定义元件，就在内置元件和自定义元件之间加一条分割线
+    // (仅在第一次添加，或者清理后重新添加时)
+    if (!fileList.isEmpty() && actionsToRemove.isEmpty()) {
+        ui->toolBar_2->addSeparator();
+    }
+
+    for (const QFileInfo &fileInfo : fileList) {
+        QAction *action = new QAction(this);
+        action->setText(fileInfo.baseName()); // 文件名作为按钮文字
+        action->setCheckable(true);
+        action->setData(fileInfo.absoluteFilePath()); // 存储完整路径
+
+        // 【核心标记】给这个 Action 打上 "isCustom" 标签，值为 true
+        action->setProperty("isCustom", true);
+
+        ui->toolBar_2->addAction(action);
+        m_addComponentActionGroup->addAction(action);
+
+        connect(action, &QAction::triggered, this, &MainWindow::onCustomComponentActionTriggered);
+    }
+}
+
+// in mainwindow.cpp
+
+void MainWindow::onCustomComponentActionTriggered()
+{
+    QAction* action = qobject_cast<QAction*>(sender());
+    if (!action) return;
+
+    GraphicsScene* scene = currentScene();
+    if (!scene) return;
+
+    QString filePath = action->data().toString();
+
+    QFile loadFile(filePath);
+    if (!loadFile.open(QIODevice::ReadOnly)) {
+        QMessageBox::warning(this, "错误", "无法读取元件文件: " + filePath);
+        action->setChecked(false); // 弹起按钮
+        return;
+    }
+    QJsonDocument loadDoc = QJsonDocument::fromJson(loadFile.readAll());
+    if (loadDoc.isNull() || !loadDoc.isObject()) {
+        QMessageBox::warning(this, "错误", "元件文件格式无效: " + filePath);
+        action->setChecked(false); // 弹起按钮
+        return;
+    }
+
+    // 设置场景进入“添加封装元件”模式，并把 JSON 数据传递过去
+    scene->setNameForNextComponent(action->text());
+    scene->setMode(GraphicsScene::AddingComponent);
+    scene->setComponentTypeToAdd(ComponentType::Encapsulated);
+    scene->setJsonForNextComponent(loadDoc.object());
+}
+void MainWindow::onCustomComponentToolbarContextMenuRequested(const QPoint &pos)
+{
+    // 1. 获取在指定位置的 Action (按钮)
+    QAction* action = ui->toolBar_2->actionAt(pos);
+
+    // 2. 检查这个 Action 是否有效，以及它是不是一个我们标记过的自定义元件
+    if (action && action->property("isCustom").toBool()) {
+        // 创建一个上下文菜单
+        QMenu contextMenu(this);
+        QAction *deleteAction = contextMenu.addAction("从库中删除");
+
+        // 弹出菜单，并等待用户操作
+        QAction *selectedAction = contextMenu.exec(ui->toolBar_2->mapToGlobal(pos));
+
+        // 3. 如果用户点击了“删除”
+        if (selectedAction == deleteAction) {
+            // 弹出确认对话框
+            QMessageBox::StandardButton reply;
+            reply = QMessageBox::question(this, "确认删除",
+                                          QString("你确定要永久删除元件 '%1' 吗？\n这个操作无法撤销。").arg(action->text()),
+                                          QMessageBox::Yes | QMessageBox::No);
+
+            if (reply == QMessageBox::Yes) {
+                // 4. 从 Action 中获取文件路径并执行删除
+                QString filePath = action->data().toString();
+                QFile file(filePath);
+                if (file.remove()) {
+                    ui->statusbar->showMessage(QString("元件 '%1' 已成功删除。").arg(action->text()), 3000);
+                    // 5. 【关键】调用刷新函数，UI 上的按钮就会消失
+                    populateCustomComponentToolbar();
+                } else {
+                    QMessageBox::critical(this, "删除失败", "无法从硬盘删除文件，请检查文件权限。");
+                }
+            }
+        }
+    }
 }

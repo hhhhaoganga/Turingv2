@@ -59,7 +59,7 @@ void ComponentItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opt
             painter->drawRect(0, 0, 50, 50);
             painter->setPen(Qt::white);
             painter->setFont(QFont("Arial", 10, QFont::Bold));
-            painter->drawText(QRectF(0,0,50,50), Qt::AlignCenter, state ? "ON" : "OFF");
+            painter->drawText(QRectF(0,0,50,50), Qt::AlignCenter, state ? "1" : "0");
             painter->setFont(QFont()); // 恢复
             painter->setPen(Qt::black);
         }
@@ -70,9 +70,13 @@ void ComponentItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opt
         text = "输出";
         if (!m_componentData->inputPins().isEmpty()) {
             state = m_componentData->inputPins()[0]->getState();
-            painter->setBrush(state ? QColor("#FFEB3B") : QColor("#616161"));
+            painter->setBrush(state ? QColor("#4CAF50") : QColor("#F44336"));
             painter->setPen(Qt::NoPen);
             painter->drawRect(0, 0, 50, 50);
+            painter->setPen(Qt::white);
+            painter->setFont(QFont("Arial", 10, QFont::Bold));
+            painter->drawText(QRectF(0,0,50,50), Qt::AlignCenter, state ? "1" : "0");
+            painter->setFont(QFont());
         }
         painter->setPen(Qt::black);
         painter->drawText(QRectF(50,0,50,50), Qt::AlignCenter, text);
@@ -85,6 +89,13 @@ void ComponentItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opt
     case ComponentType::Nor: text = "或非门"; break;
     case ComponentType::Xor: text = "异或门"; break;
     case ComponentType::Xnor: text = "同或门"; break;
+    case ComponentType::Encapsulated:
+    { // 使用花括号创建一个局部作用域
+        auto comp = static_cast<EncapsulatedComponent*>(m_componentData);
+        text = comp->getName(); // 直接获取名字作为文本
+    }
+    break;
+
     }
 
     // 为普通逻辑门统一绘制文字
@@ -257,7 +268,23 @@ void GraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
     }
 
     if (m_currentMode == AddingComponent) {
-        Component* data = m_engine->createComponent(m_typeToAdd, event->scenePos());
+        Component* data = nullptr;
+
+        // --- 【核心修改】 ---
+        if (m_typeToAdd == ComponentType::Encapsulated) {
+            // 如果要添加的是封装元件，我们不能用引擎的工厂函数创建
+            // 而是直接使用我们存储的 JSON 数据来构造
+            data = new EncapsulatedComponent(event->scenePos(), m_nameToAdd, m_jsonToAdd);
+
+            // 重要：因为我们绕过了引擎的创建函数，所以必须手动将这个新元件注册到引擎中
+            // (下一步我们将为 Engine 添加这个 registerComponent 函数)
+            m_engine->registerComponent(data);
+        } else {
+            // 对于其他普通元件，继续使用引擎的工厂函数
+            data = m_engine->createComponent(m_typeToAdd, event->scenePos());
+        }
+        // --- 【修改结束】 ---
+
         if(data) {
             addItem(new ComponentItem(data));
             emit componentAdded();
@@ -362,4 +389,12 @@ void GraphicsScene::rebuildSceneFromEngine()
 
     // （可选）给出调试信息
     qDebug() << "前台画布：已根据引擎状态成功重建。";
+}
+void GraphicsScene::setJsonForNextComponent(const QJsonObject& json)
+{
+    m_jsonToAdd = json;
+}
+void GraphicsScene::setNameForNextComponent(const QString& name)
+{
+    m_nameToAdd = name;
 }

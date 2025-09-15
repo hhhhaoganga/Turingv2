@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 #include <QMainWindow>
 #include <QActionGroup>
+
 /**
  * @file mainwindow.h
  * @brief 【C同学负责】定义了应用程序的主窗口类。
@@ -15,6 +16,7 @@
 class Engine;
 class GraphicsScene;
 class QActionGroup;
+
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -53,12 +55,17 @@ private slots:
     void onNewTab();
     void onTabClose(int index);
 
+    void onCustomComponentActionTriggered();
+
+    // 【新增】这个槽函数将用于响应在工具栏上的右键点击
+    void onCustomComponentToolbarContextMenuRequested(const QPoint &pos);
+
 private:
     Ui::MainWindow *ui;
 
     QActionGroup *m_addComponentActionGroup;
 
-
+    void populateCustomComponentToolbar();
     GraphicsScene* currentScene();
     Engine* currentEngine();
 };
