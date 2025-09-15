@@ -45,7 +45,8 @@ QPointF Component::position() const { return m_position; }
 // === 具体元件实现 ===
 Input::Input(const QPointF& pos) : Component(ComponentType::Input, pos, 0, 1), m_currentState(false) {}
 void Input::evaluate() { if (!m_outputPins.isEmpty()) { m_outputPins[0]->setState(m_currentState); } }
-void Input::toggleState() { m_currentState = !m_currentState; }
+void Input::toggleState() { m_currentState = !m_currentState; evaluate(); }
+void Input::setState(bool state) { m_currentState = state; }
 
 Output::Output(const QPointF& pos) : Component(ComponentType::Output, pos, 1, 0) {}
 void Output::evaluate() { /* 状态由输入引脚决定 */ }
@@ -90,6 +91,21 @@ Component* Engine::createComponent(ComponentType type, const QPointF& pos) {
     }
     if (newComponent) { m_components.insert(reinterpret_cast<intptr_t>(newComponent), newComponent); }
     return newComponent;
+}
+
+Component* Engine::createComponent(const QJsonObject& compObject)
+{
+    ComponentType type = static_cast<ComponentType>(compObject["type"].toInt());
+    QPointF pos(compObject["x"].toDouble(), compObject["y"].toDouble());
+
+    if (type == ComponentType::Encapsulated) {
+        // 如果是封装元件，从 "internal_circuit" 字段获取其定义
+        QJsonObject internalJson = compObject["internal_circuit"].toObject();
+        return new EncapsulatedComponent(pos, internalJson);
+    }
+
+    // 对于其他简单元件，调用旧的创建函数
+    return createComponent(type, pos);
 }
 
 Wire* Engine::createWire(Pin* startPin, Pin* endPin) {
@@ -213,7 +229,7 @@ bool Engine::loadCircuitFromJson(const QJsonObject& json)
         QPointF pos(compObject["x"].toDouble(), compObject["y"].toDouble());
 
         // 使用我们已有的工厂函数创建新元件
-        Component* newComponent = createComponent(type, pos);
+        Component* newComponent = createComponent(compObject);
         if (newComponent) {
             // 将旧ID和新元件的映射关系存入Map
             idMap[id] = newComponent;
@@ -275,7 +291,11 @@ QJsonObject Engine::saveCircuitToJson() const
         compObject["type"] = static_cast<int>(comp->type());
         compObject["x"] = comp->position().x();
         compObject["y"] = comp->position().y();
-
+        if (comp->type() == ComponentType::Encapsulated) {
+            // 如果是封装元件，额外保存其内部电路的JSON定义
+            auto encapsulatedComp = static_cast<EncapsulatedComponent*>(comp);
+            compObject["internal_circuit"] = encapsulatedComp->getInternalJson();
+        }
         componentsArray.append(compObject);
     }
 
@@ -297,4 +317,86 @@ QJsonObject Engine::saveCircuitToJson() const
     circuitJson["wires"] = wiresArray;
 
     return circuitJson;
+}
+// in engine.cpp at the end of the file
+
+// ===============================================
+// === EncapsulatedComponent 实现
+// ===============================================
+
+EncapsulatedComponent::EncapsulatedComponent(const QPointF& pos, const QJsonObject& internalCircuitJson)
+    // 构造函数调用父类，但输入输出引脚数暂时为0，后面动态计算
+    : Component(ComponentType::Encapsulated, pos, 0, 0),
+    m_internalEngine(new Engine()),
+    m_internalCircuitJson(internalCircuitJson)
+{
+    // 1. 加载内部电路到迷你引擎
+    m_internalEngine->loadCircuitFromJson(m_internalCircuitJson);
+
+    // 2. 根据内部电路的 Input/Output 元件，建立引脚映射并创建外部引脚
+    buildPinMappings();
+}
+
+EncapsulatedComponent::~EncapsulatedComponent()
+{
+    delete m_internalEngine;
+}
+
+void EncapsulatedComponent::buildPinMappings()
+{
+    // 遍历内部引擎的所有元件，寻找 Input 和 Output
+    for (Component* comp : m_internalEngine->getAllComponents().values()) {
+        if (comp->type() == ComponentType::Input) {
+            // 内部的 Input 元件，它的输出就是我们封装体的“输入”
+            m_internalInputs.append(comp->outputPins()[0]);
+        } else if (comp->type() == ComponentType::Output) {
+            // 内部的 Output 元件，它的输入就是我们封装体的“输出”
+            m_internalOutputs.append(comp->inputPins()[0]);
+        }
+    }
+
+    // 根据找到的内外引脚数量，动态创建自己的引脚
+    for (int i = 0; i < m_internalInputs.size(); ++i) {
+        m_inputPins.append(new Pin(this, Pin::Input, i));
+    }
+    for (int i = 0; i < m_internalOutputs.size(); ++i) {
+        m_outputPins.append(new Pin(this, Pin::Output, i));
+    }
+}
+
+void EncapsulatedComponent::evaluate()
+{
+    // 1. 将外部输入引脚的状态，传递给内部电路对应的 Input 元件
+    for (int i = 0; i < m_inputPins.size(); ++i) {
+        bool externalState = m_inputPins[i]->getState();
+        Component* internalInputComp = m_internalInputs[i]->owner();
+        // 我们需要一种方式来直接设置 Input 元件的状态
+        // 我们去给 Input 类加一个 setState 方法
+        static_cast<Input*>(internalInputComp)->setState(externalState);
+    }
+
+    // 2. 运行内部电路的仿真
+    m_internalEngine->simulate();
+
+    // 3. 从内部电路的 Output 元件获取状态，设置到自己的外部输出引脚上
+    for (int i = 0; i < m_outputPins.size(); ++i) {
+        bool internalState = m_internalOutputs[i]->getState();
+        m_outputPins[i]->setState(internalState);
+    }
+}
+
+const QJsonObject& EncapsulatedComponent::getInternalJson() const
+{
+    return m_internalCircuitJson;
+}
+
+// in engine.cpp
+
+// ... (在文件中的任何位置添加这个新函数的实现)
+
+void Engine::registerComponent(Component* component)
+{
+    if (component) {
+        m_components.insert(reinterpret_cast<intptr_t>(component), component);
+    }
 }

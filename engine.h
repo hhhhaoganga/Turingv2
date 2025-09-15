@@ -16,7 +16,7 @@ class ComponentItem;
 // ===============================================
 
 enum class ComponentType {
-    Input, Output, And, Or, Not, Nand, Nor, Xor, Xnor
+    Input, Output, And, Or, Not, Nand, Nor, Xor, Xnor, Encapsulated
 };
 
 class Pin {
@@ -73,6 +73,7 @@ public:
     Input(const QPointF& pos);
     void evaluate() override;
     void toggleState();
+    void setState(bool state);
 private:
     bool m_currentState;
 };
@@ -90,6 +91,7 @@ public:
     Engine();
     ~Engine();
     Component* createComponent(ComponentType type, const QPointF& pos);
+    Component* createComponent(const QJsonObject& compObject);
     Wire* createWire(Pin* startPin, Pin* endPin);
     void simulate();
     const QMap<intptr_t, Component*>& getAllComponents() const;
@@ -98,11 +100,35 @@ public:
     void deleteWire(Wire* wire);
     bool loadCircuitFromJson(const QJsonObject& json);
     void clearAll();
+    void registerComponent(Component* component);
     QJsonObject saveCircuitToJson() const;
+    QJsonObject saveComponentsToJson(const QVector<Component*>& components) const;
 private:
     QMap<intptr_t, Component*> m_components;
     QVector<Wire*> m_wires;
 };
+class EncapsulatedComponent : public Component {
+public:
+    EncapsulatedComponent(const QPointF& pos, const QJsonObject& internalCircuitJson);
+    ~EncapsulatedComponent() override;
 
+    // 核心评估函数
+    void evaluate() override;
+
+    // 用于保存/加载
+    const QJsonObject& getInternalJson() const;
+
+private:
+    void buildPinMappings();
+
+    // 每个封装元件内部都有一个自己的“迷你引擎”
+    Engine* m_internalEngine;
+    // 保存内部电路的定义，用于序列化
+    QJsonObject m_internalCircuitJson;
+
+    // 外部引脚到内部引脚的映射
+    QVector<Pin*> m_internalInputs;  // 指向内部 Input 元件的输出引脚
+    QVector<Pin*> m_internalOutputs; // 指向内部 Output 元件的输入引脚
+};
 
 #endif // ENGINE_H

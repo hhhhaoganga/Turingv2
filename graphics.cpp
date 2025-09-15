@@ -257,7 +257,23 @@ void GraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
     }
 
     if (m_currentMode == AddingComponent) {
-        Component* data = m_engine->createComponent(m_typeToAdd, event->scenePos());
+        Component* data = nullptr;
+
+        // --- 【核心修改】 ---
+        if (m_typeToAdd == ComponentType::Encapsulated) {
+            // 如果要添加的是封装元件，我们不能用引擎的工厂函数创建
+            // 而是直接使用我们存储的 JSON 数据来构造
+            data = new EncapsulatedComponent(event->scenePos(), m_jsonToAdd);
+
+            // 重要：因为我们绕过了引擎的创建函数，所以必须手动将这个新元件注册到引擎中
+            // (下一步我们将为 Engine 添加这个 registerComponent 函数)
+            m_engine->registerComponent(data);
+        } else {
+            // 对于其他普通元件，继续使用引擎的工厂函数
+            data = m_engine->createComponent(m_typeToAdd, event->scenePos());
+        }
+        // --- 【修改结束】 ---
+
         if(data) {
             addItem(new ComponentItem(data));
             emit componentAdded();
@@ -362,4 +378,8 @@ void GraphicsScene::rebuildSceneFromEngine()
 
     // （可选）给出调试信息
     qDebug() << "前台画布：已根据引擎状态成功重建。";
+}
+void GraphicsScene::setJsonForNextComponent(const QJsonObject& json)
+{
+    m_jsonToAdd = json;
 }
