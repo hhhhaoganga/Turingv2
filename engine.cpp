@@ -1,17 +1,28 @@
-#include "engine.h"
-#include "graphics.h"
-#include <QMessageBox>
-#include <QDebug>
-#include <QJsonObject>
-#include <QJsonArray>
-#include <algorithm>
+#include "engine.h"        // 引擎与组件/导线/引脚的声明
+#include "graphics.h"      // 访问 ComponentItem（用于计算引脚场景坐标）
+#include <QMessageBox>      // 弹出非法连接等警告
+#include <QDebug>           // 调试日志输出
+#include <QJsonObject>      // JSON 对象读写
+#include <QJsonArray>       // JSON 数组读写
+#include <algorithm>        // std::sort 等算法
+/**
+ * @file engine.cpp
+ * @brief 引擎与基础数据结构(Pin/Wire/Component)的实现，以及封装元件逻辑。
+ */
 // === Pin 实现 ===
+/** Pin 构造函数 */
 Pin::Pin(Component* owner, PinType type, int index) : m_owner(owner), m_type(type), m_index(index), m_state(false) {}
+/** 获取引脚状态 */
 bool Pin::getState() const { return m_state; }
+/** 设置引脚状态 */
 void Pin::setState(bool state) { m_state = state; }
+/** 获取所属组件 */
 Component* Pin::owner() const { return m_owner; }
+/** 获取引脚类型 */
 Pin::PinType Pin::type() const { return m_type; }
+/** 获取引脚索引 */
 int Pin::index() const { return m_index; }
+/** 计算并返回场景坐标中的引脚位置 */
 QPointF Pin::getScenePos() const {
     if (m_owner && m_owner->getGraphicsItem()) {
         int pinCount = (m_type == Input) ? m_owner->inputPins().size() : m_owner->outputPins().size();
@@ -23,63 +34,99 @@ QPointF Pin::getScenePos() const {
 }
 
 // === Wire 实现 ===
+/** Wire 构造函数：连接两个引脚 */
 Wire::Wire(Pin* start, Pin* end) : m_startPin(start), m_endPin(end) {}
+/** 获取起始引脚 */
 Pin* Wire::startPin() const { return m_startPin; }
+/** 获取终止引脚 */
 Pin* Wire::endPin() const { return m_endPin; }
+/** 导线状态：等于起始引脚状态 */
 bool Wire::getState() const { return m_startPin->getState(); }
 
 // === Component 实现 ===
+/** Component 构造：根据数量创建输入/输出引脚 */
 Component::Component(ComponentType type, const QPointF& position, int numInputs, int numOutputs) : m_type(type), m_position(position), m_graphicsItem(nullptr) {
     for (int i = 0; i < numInputs; ++i) m_inputPins.append(new Pin(this, Pin::Input, i));
     for (int i = 0; i < numOutputs; ++i) m_outputPins.append(new Pin(this, Pin::Output, i));
 }
+/** 析构：释放引脚 */
 Component::~Component() { qDeleteAll(m_inputPins); qDeleteAll(m_outputPins); }
+/** 获取类型 */
 ComponentType Component::type() const { return m_type; }
+/** 读取输入引脚 */
 const QVector<Pin*>& Component::inputPins() const { return m_inputPins; }
+/** 读取输出引脚 */
 const QVector<Pin*>& Component::outputPins() const { return m_outputPins; }
+/** 绑定图形项 */
 void Component::setGraphicsItem(ComponentItem* item) { m_graphicsItem = item; }
+/** 获取图形项 */
 ComponentItem* Component::getGraphicsItem() const { return m_graphicsItem; }
+/** 设置位置 */
 void Component::setPosition(const QPointF& pos) { m_position = pos; }
+/** 获取位置 */
 QPointF Component::position() const { return m_position; }
 
 
 // === 具体元件实现 ===
+/** Input 构造：0入1出 */
 Input::Input(const QPointF& pos) : Component(ComponentType::Input, pos, 0, 1), m_currentState(false) {}
+/** 将内部状态输出到引脚 */
 void Input::evaluate() { if (!m_outputPins.isEmpty()) { m_outputPins[0]->setState(m_currentState); } }
+/** 翻转状态 */
 void Input::toggleState() { m_currentState = !m_currentState; evaluate(); }
+/** 设置状态并触发一次评估 */
 void Input::setState(bool state) {
     m_currentState = state;
     evaluate(); // <-- 加上这一行！
 }
 
+/** Output 构造：1入0出 */
 Output::Output(const QPointF& pos) : Component(ComponentType::Output, pos, 1, 0) {}
+/** 输出端不主动改变状态，显示输入 */
 void Output::evaluate() { /* 状态由输入引脚决定 */ }
 
+/** 与门：2入1出 */
 AndGate::AndGate(const QPointF& pos) : Component(ComponentType::And, pos, 2, 1) {}
+/** 计算与 */
 void AndGate::evaluate() { if (m_inputPins.size() == 2 && !m_outputPins.isEmpty()) m_outputPins[0]->setState(m_inputPins[0]->getState() && m_inputPins[1]->getState()); }
 
+/** 或门：2入1出 */
 OrGate::OrGate(const QPointF& pos) : Component(ComponentType::Or, pos, 2, 1) {}
+/** 计算或 */
 void OrGate::evaluate() { if (m_inputPins.size() == 2 && !m_outputPins.isEmpty()) m_outputPins[0]->setState(m_inputPins[0]->getState() || m_inputPins[1]->getState()); }
 
+/** 非门：1入1出 */
 NotGate::NotGate(const QPointF& pos) : Component(ComponentType::Not, pos, 1, 1) {}
+/** 计算非 */
 void NotGate::evaluate() { if (!m_inputPins.isEmpty() && !m_outputPins.isEmpty()) m_outputPins[0]->setState(!m_inputPins[0]->getState()); }
 
+/** 与非门：2入1出 */
 NandGate::NandGate(const QPointF& pos) : Component(ComponentType::Nand, pos, 2, 1) {}
+/** 计算与非 */
 void NandGate::evaluate() { if (m_inputPins.size() == 2 && !m_outputPins.isEmpty()) m_outputPins[0]->setState(!(m_inputPins[0]->getState() && m_inputPins[1]->getState())); }
 
+/** 或非门：2入1出 */
 NorGate::NorGate(const QPointF& pos) : Component(ComponentType::Nor, pos, 2, 1) {}
+/** 计算或非 */
 void NorGate::evaluate() { if (m_inputPins.size() == 2 && !m_outputPins.isEmpty()) m_outputPins[0]->setState(!(m_inputPins[0]->getState() || m_inputPins[1]->getState())); }
 
+/** 异或门：2入1出 */
 XorGate::XorGate(const QPointF& pos) : Component(ComponentType::Xor, pos, 2, 1) {}
+/** 计算异或 */
 void XorGate::evaluate() { if (m_inputPins.size() == 2 && !m_outputPins.isEmpty()) m_outputPins[0]->setState(m_inputPins[0]->getState() != m_inputPins[1]->getState()); }
 
+/** 同或门：2入1出 */
 XnorGate::XnorGate(const QPointF& pos) : Component(ComponentType::Xnor, pos, 2, 1) {}
+/** 计算同或 */
 void XnorGate::evaluate() { if (m_inputPins.size() == 2 && !m_outputPins.isEmpty()) m_outputPins[0]->setState(m_inputPins[0]->getState() == m_inputPins[1]->getState()); }
 
 // === Engine 实现 ===
+/** 引擎构造 */
 Engine::Engine() {}
+/** 析构：释放组件与导线 */
 Engine::~Engine() { qDeleteAll(m_components.values()); qDeleteAll(m_wires); }
 
+/** 创建组件并注册到引擎 */
 Component* Engine::createComponent(ComponentType type, const QPointF& pos) {
     Component* newComponent = nullptr;
     switch (type) {
@@ -97,8 +144,11 @@ Component* Engine::createComponent(ComponentType type, const QPointF& pos) {
     return newComponent;
 }
 
-// in engine.cpp
-
+/**
+ * @brief 从JSON对象创建组件（支持 Encapsulated）。
+ * @param compObject 组件的JSON定义（包含 type/x/y 以及封装元件的内部定义）
+ * @return 创建成功返回新组件指针，失败返回nullptr
+ */
 Component* Engine::createComponent(const QJsonObject& compObject)
 {
     ComponentType type = static_cast<ComponentType>(compObject["type"].toInt());
@@ -122,10 +172,16 @@ Component* Engine::createComponent(const QJsonObject& compObject)
         return newComponent;
     }
 
-    // 对于其他简单元件，调用旧的创建函数 (该函数内部已经包含了注册逻辑)
+    // 对于其他简单元件，调用旧的创建函数 (该函数内部已经包含注册逻辑)
     return createComponent(type, pos);
 }
 
+/**
+ * @brief 创建导线：做多项合法性检查与端点类型规范化。
+ * @param startPin 起点引脚（可为输入/输出，内部会规范为输出）
+ * @param endPin 终点引脚（将规范为输入）
+ * @return 创建成功返回新导线指针，失败返回nullptr
+ */
 Wire* Engine::createWire(Pin* startPin, Pin* endPin) {
     if (!startPin || !endPin || startPin->owner() == endPin->owner() || startPin->type() == endPin->type()) {
         QMessageBox::warning(nullptr, "非法连接", "不能连接到自身或同类型引脚。");
@@ -147,10 +203,10 @@ Wire* Engine::createWire(Pin* startPin, Pin* endPin) {
     return newWire;
 }
 
-// in engine.cpp
-
-// in engine.cpp
-
+/**
+ * @brief 运行传播-评估循环，直到稳定或达到最大迭代次数。
+ * @details 处理删除导线后的残留状态，通过在每轮开始清零非源头输入引脚修复。
+ */
 void Engine::simulate()
 {
     const int maxIterations = 100;
@@ -203,9 +259,12 @@ void Engine::simulate()
         }
     }
 }
+/** @return 返回组件映射（键为指针地址） */
 const QMap<intptr_t, Component*>& Engine::getAllComponents() const { return m_components; }
+/** @return 返回所有导线的数组 */
 const QVector<Wire*>& Engine::getAllWires() const { return m_wires; }
 
+/** 删除组件：从Map移除并释放 */
 void Engine::deleteComponent(Component* component) {
     if (!component) {
         return; // 如果传入的是空指针，直接返回
@@ -220,11 +279,14 @@ void Engine::deleteComponent(Component* component) {
         delete component;
     }
 }
+/** 删除导线并释放 */
 void Engine::deleteWire(Wire* wire) { if (!wire) return; m_wires.removeAll(wire); delete wire; }
 
-// 在 engine.cpp 文件中
-// in engine.cpp
-
+/**
+ * @brief 从JSON加载电路（先清空，再内部加载并simulate）。
+ * @param json 完整电路的JSON对象（components + wires）
+ * @return 成功返回true，失败返回false
+ */
 bool Engine::loadCircuitFromJson(const QJsonObject& json)
 {
     // 使命A：清空！
@@ -239,6 +301,7 @@ bool Engine::loadCircuitFromJson(const QJsonObject& json)
 
     return false;
 }
+/** 清空所有组件与导线 */
 void Engine::clearAll() {
     qDeleteAll(m_wires);
     m_wires.clear();
@@ -246,6 +309,10 @@ void Engine::clearAll() {
     m_components.clear();
 }
 
+/**
+ * @brief 将当前电路序列化为JSON：组件+导线。
+ * @return 代表电路的JSON对象
+ */
 QJsonObject Engine::saveCircuitToJson() const
 {
     QJsonObject circuitJson; // 这是最终要返回的JSON总对象
@@ -288,12 +355,11 @@ QJsonObject Engine::saveCircuitToJson() const
 
     return circuitJson;
 }
-// in engine.cpp at the end of the file
-
 // ===============================================
 // === EncapsulatedComponent 实现
 // ===============================================
 
+/** 构造封装元件：创建内部引擎并载入内部电路，随后构建引脚映射 */
 EncapsulatedComponent::EncapsulatedComponent(const QPointF& pos, const QString& name, const QJsonObject& internalCircuitJson)
     : Component(ComponentType::Encapsulated, pos, 0, 0),
     m_internalEngine(new Engine()),
@@ -307,16 +373,22 @@ EncapsulatedComponent::EncapsulatedComponent(const QPointF& pos, const QString& 
     buildPinMappings();
 }
 
+/** 析构：释放内部引擎 */
 EncapsulatedComponent::~EncapsulatedComponent()
 {
     delete m_internalEngine;
 }
 
+/** 获取封装元件名称 */
 QString EncapsulatedComponent::getName() const
 {
     return m_name;
 }
 
+/**
+ * @brief 构建外部引脚与内部Input/Output的映射，并按Y坐标排序保持一致。
+ * @return 无返回值
+ */
 void EncapsulatedComponent::buildPinMappings()
 {
     // --- 1. 先收集所有内部的 Input 和 Output 元件 ---
@@ -361,6 +433,11 @@ void EncapsulatedComponent::buildPinMappings()
     }
 }
 
+/**
+ * @brief 评估封装元件：
+ * 1) 同步外部输入到内部Input；2) 运行内部引擎；3) 回填内部Output到外部输出。
+ * @return 无返回值
+ */
 void EncapsulatedComponent::evaluate()
 {
     // 1. 将外部输入引脚的状态，传递给内部电路对应的 Input 元件
@@ -382,23 +459,28 @@ void EncapsulatedComponent::evaluate()
     }
 }
 
+/** @return 内部电路定义JSON（只读引用） */
 const QJsonObject& EncapsulatedComponent::getInternalJson() const
 {
     return m_internalCircuitJson;
 }
 
-// in engine.cpp
-
-// ... (在文件中的任何位置添加这个新函数的实现)
-
+/**
+ * @brief 手动注册一个外部创建的组件（封装元件等）。
+ * @param component 需要注册到引擎管理的组件指针
+ * @return 无返回值
+ */
 void Engine::registerComponent(Component* component)
 {
     if (component) {
         m_components.insert(reinterpret_cast<intptr_t>(component), component);
     }
 }
-// in engine.cpp
-
+/**
+ * @brief 内部加载函数：不清空现有内容，使用ID映射重建组件与导线。
+ * @param json 完整电路JSON
+ * @return 成功返回true，失败返回false
+ */
 bool Engine::loadCircuitInternal(const QJsonObject& json)
 {
     // 【核心】没有 clearAll()

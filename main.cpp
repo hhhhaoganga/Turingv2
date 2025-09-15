@@ -1,6 +1,10 @@
-#include "mainwindow.h"
+#include "mainwindow.h"  // 主窗口入口
 
-#include <QApplication>
+#include <QApplication>   // Qt 应用对象
+
+/**
+ * @brief 程序入口：创建应用与主窗口。
+ */
 
 int main(int argc, char *argv[])
 {

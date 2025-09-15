@@ -1,24 +1,25 @@
-#include "mainwindow.h"
-#include "engine.h"
-#include "graphics.h"
-#include "ui_mainwindow.h"
-#include <QActionGroup>
-#include <QMessageBox>
-#include <QFileDialog>
-#include <QInputDialog>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QFile>
-#include <QFileInfo>
-#include <QTabWidget>
-#include <QToolButton>
-#include <QPainter> // 为了设置 QGraphicsView 的渲染提示
-#include <QGraphicsView>
-#include <QInputDialog>
-#include <QDir>
-#include <QMessageBox>
-#include <QToolBar>
-#include <QMenu>
+#include "mainwindow.h"     // 主窗口声明
+#include "engine.h"         // 使用 Engine 接口
+#include "graphics.h"       // 使用 GraphicsScene/Item
+#include "ui_mainwindow.h"  // Qt Designer 生成的UI类
+#include <QActionGroup>       // 互斥动作组
+#include <QMessageBox>        // 弹窗提示
+#include <QFileDialog>        // 文件选择对话框
+#include <QInputDialog>       // 简易输入框
+#include <QJsonDocument>      // JSON 文档读写
+#include <QJsonObject>        // JSON 对象
+#include <QFile>              // 文件IO
+#include <QFileInfo>          // 路径/扩展处理
+#include <QTabWidget>         // 多标签容器
+#include <QPainter>           // 设置 QGraphicsView 的渲染提示
+#include <QGraphicsView>      // 视图容器
+#include <QDir>               // 目录访问
+#include <QToolBar>           // 工具栏
+#include <QMenu>              // 右键菜单
+/**
+ * @file mainwindow.cpp
+ * @brief 主窗口实现：多标签页管理、文件读写、自定义元件封装与加载。
+ */
 /**
  * @file mainwindow.cpp
  * @brief 【C同学负责】实现主窗口的所有功能，已升级为多标签页架构。
@@ -29,6 +30,7 @@ void MainWindow::on_actionNew_Tab_triggered()
     onNewTab(); // 直接调用我们已有的 onNewTab() 逻辑即可
 }
 // 目的: 构造主窗口，完成所有模块的初始化和“粘合”工作。
+/** 构造主窗口：初始化UI、动作组、工具栏与默认标签页 */
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
@@ -70,6 +72,7 @@ MainWindow::MainWindow(QWidget *parent)
 }
 
 // 目的: 销毁主窗口时，清理我们手动创建的对象，防止内存泄漏。
+/** 析构：释放UI（标签页中Engine由关闭时释放） */
 MainWindow::~MainWindow()
 {
     delete ui;
@@ -78,6 +81,7 @@ MainWindow::~MainWindow()
 
 // === 辅助函数：获取当前活动标签页的 Engine 和 Scene ===
 
+/** 返回当前标签页的场景指针 */
 GraphicsScene* MainWindow::currentScene() {
     if (ui->tabWidget->currentIndex() == -1) {
         return nullptr;
@@ -89,6 +93,7 @@ GraphicsScene* MainWindow::currentScene() {
     return nullptr;
 }
 
+/** 返回当前标签页的引擎指针 */
 Engine* MainWindow::currentEngine() {
     GraphicsScene* scene = currentScene();
     if (scene) {
@@ -100,6 +105,7 @@ Engine* MainWindow::currentEngine() {
 
 // === 标签页管理槽函数 ===
 
+/** 新建一个标签页：创建独立 Engine 与 Scene 并安装到视图 */
 void MainWindow::onNewTab()
 {
     // 1. 为新标签页创建一套独立的 Engine 和 Scene
@@ -121,6 +127,7 @@ void MainWindow::onNewTab()
     connect(scene, &GraphicsScene::componentAdded, this, &MainWindow::onComponentPlaced);
 }
 
+/** 关闭指定索引的标签页，并释放其 Engine */
 void MainWindow::onTabClose(int index)
 {
     // 在关闭前，可以增加“是否保存”的提示，这里为了简化先直接关闭
@@ -144,6 +151,7 @@ void MainWindow::onTabClose(int index)
 
 // === UI Action 槽函数（已全部适配多标签页） ===
 
+/** 工具栏：添加输入元件 */
 void MainWindow::on_actionAdd_Input_triggered()
 {
     GraphicsScene* scene = currentScene();
@@ -152,6 +160,7 @@ void MainWindow::on_actionAdd_Input_triggered()
         scene->setMode(GraphicsScene::AddingComponent);
     }
 }
+/** 工具栏：添加输出元件 */
 void MainWindow::on_actionAdd_Output_triggered()
 {
     GraphicsScene* scene = currentScene();
@@ -160,6 +169,7 @@ void MainWindow::on_actionAdd_Output_triggered()
         scene->setMode(GraphicsScene::AddingComponent);
     }
 }
+/** 工具栏：添加与门 */
 void MainWindow::on_actionAdd_AndGate_triggered()
 {
     GraphicsScene* scene = currentScene();
@@ -168,6 +178,7 @@ void MainWindow::on_actionAdd_AndGate_triggered()
         scene->setMode(GraphicsScene::AddingComponent);
     }
 }
+/** 工具栏：添加或门 */
 void MainWindow::on_actionAdd_OrGate_triggered()
 {
     GraphicsScene* scene = currentScene();
@@ -176,6 +187,7 @@ void MainWindow::on_actionAdd_OrGate_triggered()
         scene->setMode(GraphicsScene::AddingComponent);
     }
 }
+/** 工具栏：添加非门 */
 void MainWindow::on_actionAdd_NotGate_triggered()
 {
     GraphicsScene* scene = currentScene();
@@ -184,6 +196,7 @@ void MainWindow::on_actionAdd_NotGate_triggered()
         scene->setMode(GraphicsScene::AddingComponent);
     }
 }
+/** 工具栏：添加与非门 */
 void MainWindow::on_actionAdd_NandGate_triggered()
 {
     GraphicsScene* scene = currentScene();
@@ -192,6 +205,7 @@ void MainWindow::on_actionAdd_NandGate_triggered()
         scene->setMode(GraphicsScene::AddingComponent);
     }
 }
+/** 工具栏：添加或非门 */
 void MainWindow::on_actionAdd_NorGate_triggered()
 {
     GraphicsScene* scene = currentScene();
@@ -200,6 +214,7 @@ void MainWindow::on_actionAdd_NorGate_triggered()
         scene->setMode(GraphicsScene::AddingComponent);
     }
 }
+/** 工具栏：添加异或门 */
 void MainWindow::on_actionAdd_XorGate_triggered()
 {
     GraphicsScene* scene = currentScene();
@@ -208,6 +223,7 @@ void MainWindow::on_actionAdd_XorGate_triggered()
         scene->setMode(GraphicsScene::AddingComponent);
     }
 }
+/** 工具栏：添加同或门 */
 void MainWindow::on_actionAdd_XnorGate_triggered()
 {
     GraphicsScene* scene = currentScene();
@@ -217,6 +233,7 @@ void MainWindow::on_actionAdd_XnorGate_triggered()
     }
 }
 
+/** 清空当前画布与引擎数据 */
 void MainWindow::on_actionClear_triggered(){
     Engine* engine = currentEngine();
     GraphicsScene* scene = currentScene();
@@ -229,6 +246,7 @@ void MainWindow::on_actionClear_triggered(){
     }
 }
 
+/** 元件放置后：取消工具栏选中并恢复状态栏 */
 void MainWindow::onComponentPlaced()
 {
     // 检查当前是否有被按下的(checked)动作
@@ -248,6 +266,7 @@ void MainWindow::onComponentPlaced()
     ui->statusbar->showMessage("准备就绪");
 }
 
+/** 保存当前电路为JSON文件 */
 void MainWindow::on_actionSave_triggered()
 {
     Engine* engine = currentEngine();
@@ -293,6 +312,7 @@ void MainWindow::on_actionSave_triggered()
 
 // ... (其他函数保持不变) ...
 
+/** 打开JSON文件到新标签页，并重建场景 */
 void MainWindow::on_actionOpen_triggered()
 {
     // 1. 打开文件对话框，让用户选择文件
@@ -364,6 +384,7 @@ void MainWindow::on_actionOpen_triggered()
 
 // in mainwindow.cpp
 
+/** 将当前电路保存为一个自定义封装元件 */
 void MainWindow::on_actionEncapsulate_triggered()
 {
     Engine* engine = currentEngine();
@@ -420,6 +441,7 @@ void MainWindow::on_actionEncapsulate_triggered()
 
 // in mainwindow.cpp
 
+/** 扫描应用目录下 components/，重建自定义元件的工具栏按钮 */
 void MainWindow::populateCustomComponentToolbar()
 {
     // --- 1. 清理旧的自定义按钮 ---
@@ -470,6 +492,7 @@ void MainWindow::populateCustomComponentToolbar()
 
 // in mainwindow.cpp
 
+/** 点击自定义元件按钮：读取JSON并设置场景为添加封装元件模式 */
 void MainWindow::onCustomComponentActionTriggered()
 {
     QAction* action = qobject_cast<QAction*>(sender());
@@ -499,6 +522,7 @@ void MainWindow::onCustomComponentActionTriggered()
     scene->setComponentTypeToAdd(ComponentType::Encapsulated);
     scene->setJsonForNextComponent(loadDoc.object());
 }
+/** 在自定义元件工具栏上右键：提供删除该库元件的操作 */
 void MainWindow::onCustomComponentToolbarContextMenuRequested(const QPoint &pos)
 {
     // 1. 获取在指定位置的 Action (按钮)

@@ -1,24 +1,31 @@
-#include "graphics.h"
-#include "engine.h"
-#include <QPainter>
-#include <QGraphicsSceneMouseEvent>
-#include <QDebug>
-#include <QStyleOptionGraphicsItem>
+#include "graphics.h"                // 图形项与场景类声明
+#include "engine.h"                  // 访问 Component/Pin/Wire 数据
+#include <QPainter>                   // 自定义绘制
+#include <QGraphicsSceneMouseEvent>   // 场景鼠标事件
+#include <QDebug>                     // 调试输出
+#include <QStyleOptionGraphicsItem>   // 绘制选中态等风格信息
+/**
+ * @file graphics.cpp
+ * @brief 前端图形项(ComponentItem/WireItem)与交互场景(GraphicsScene)的实现。
+ */
 
 // ===============================================
 // === ComponentItem 实现
 // ===============================================
 
+/** 通过后端组件数据构造，并建立双向绑定 */
 ComponentItem::ComponentItem(Component* data) : m_componentData(data) {
     setPos(data->position());
     setFlags(ItemIsMovable | ItemIsSelectable | ItemSendsGeometryChanges);
     data->setGraphicsItem(this);
 }
 
+/** 返回组件的包围盒 */
 QRectF ComponentItem::boundingRect() const {
     return QRectF(-10, -10, 120, 70); // 扩展边界以容纳引脚
 }
 
+/** 绘制组件主体、文字、引脚与选中高亮效果 */
 void ComponentItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
 {
     QRectF bodyRect(0, 0, 100, 50);
@@ -119,10 +126,12 @@ void ComponentItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opt
     }
 }
 
+/** 返回后端组件数据 */
 Component* ComponentItem::component() const {
     return m_componentData;
 }
 
+/** 根据局部坐标命中检测，返回被击中的引脚 */
 Pin* ComponentItem::getPinAt(const QPointF &localPos) {
     const qreal pinRadius = 4.0;
     const qreal clickableRadius = pinRadius * 2;
@@ -147,6 +156,7 @@ Pin* ComponentItem::getPinAt(const QPointF &localPos) {
     return nullptr;
 }
 
+/** 捕获位置变化，将位置同步回后端数据 */
 QVariant ComponentItem::itemChange(GraphicsItemChange change, const QVariant &value) {
     if (change == ItemPositionHasChanged && m_componentData) {
         // 将 this->pos() 改为 value.toPointF()
@@ -160,21 +170,25 @@ QVariant ComponentItem::itemChange(GraphicsItemChange change, const QVariant &va
 // === WireItem 实现
 // ===============================================
 
+/** 构造导线图形项 */
 WireItem::WireItem(Wire* data) : m_wireData(data) {
     setPen(QPen(Qt::black, 2));
     setZValue(-1); // 确保导线在元件下面
 }
 
+/** 获取后端导线数据 */
 Wire* WireItem::wireData() const {
     return m_wireData;
 }
 
+/** 使用后端引脚的场景坐标更新几何 */
 void WireItem::updatePosition() {
     if (m_wireData) {
         setLine(QLineF(m_wireData->startPin()->getScenePos(), m_wireData->endPin()->getScenePos()));
     }
 }
 
+/** 根据导线状态上色绘制 */
 void WireItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) {
     if (!m_wireData) return;
     bool state = m_wireData->getState();
@@ -189,20 +203,22 @@ void WireItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, 
 // === GraphicsScene 实现
 // ===============================================
 
+/** 通过引擎构造场景，初始化交互状态 */
 GraphicsScene::GraphicsScene(Engine* engine, QObject* parent)
     : QGraphicsScene(parent), m_engine(engine), m_tempLine(nullptr), m_startPin(nullptr), m_currentMode(Idle)
 {}
 
+/** 设置场景交互模式 */
 void GraphicsScene::setMode(Mode mode) {
     m_currentMode = mode;
 }
 
+/** 设置下一个要添加的组件类型 */
 void GraphicsScene::setComponentTypeToAdd(ComponentType type) {
     m_typeToAdd = type;
 }
 
-// in graphics.cpp
-
+/** 处理按下事件：右键删除、左键放置/连线 */
 void GraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
     // =============================================================
@@ -316,6 +332,7 @@ void GraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
     QGraphicsScene::mousePressEvent(event);
 }
 
+/** 拖动事件：更新临时连线或刷新导线位置 */
 void GraphicsScene::mouseMoveEvent(QGraphicsSceneMouseEvent *event) {
     if (m_tempLine) {
         m_tempLine->setLine(QLineF(m_tempLine->line().p1(), event->scenePos()));
@@ -330,8 +347,7 @@ void GraphicsScene::mouseMoveEvent(QGraphicsSceneMouseEvent *event) {
     }
 }
 
-// 找到 GraphicsScene::mouseReleaseEvent 函数
-
+/** 释放事件：尝试完成连线并触发仿真 */
 void GraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event) {
     if (m_tempLine) {
         removeItem(m_tempLine);
@@ -367,6 +383,7 @@ void GraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event) {
     QGraphicsScene::mouseReleaseEvent(event);
 }
 
+/** 根据引擎当前数据重建整张画布（打开文件后使用） */
 void GraphicsScene::rebuildSceneFromEngine()
 {
     // 1. 清空当前画布上所有的图形项
@@ -390,10 +407,12 @@ void GraphicsScene::rebuildSceneFromEngine()
     // （可选）给出调试信息
     qDebug() << "前台画布：已根据引擎状态成功重建。";
 }
+/** 设置下一个封装元件的内部JSON */
 void GraphicsScene::setJsonForNextComponent(const QJsonObject& json)
 {
     m_jsonToAdd = json;
 }
+/** 设置下一个封装元件的名称 */
 void GraphicsScene::setNameForNextComponent(const QString& name)
 {
     m_nameToAdd = name;
