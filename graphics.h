@@ -56,6 +56,7 @@ public:
     Engine* getEngine() const;
 
     void setJsonForNextComponent(const QJsonObject& json);
+    void setNameForNextComponent(const QString& name);
 signals:
     void componentAdded();
 protected:
@@ -73,6 +74,8 @@ private:
 
     // 【新增】用于临时存储下一个要创建的封装元件的 JSON 定义
     QJsonObject m_jsonToAdd;
+
+    QString m_nameToAdd;
 };
 inline Engine* GraphicsScene::getEngine() const {
         return m_engine;

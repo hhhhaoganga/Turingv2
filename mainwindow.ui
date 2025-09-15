@@ -130,9 +130,6 @@
    </property>
   </action>
   <action name="actionEncapsulate">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
    <property name="text">
     <string>封装</string>
    </property>

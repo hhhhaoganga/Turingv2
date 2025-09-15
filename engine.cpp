@@ -4,6 +4,7 @@
 #include <QDebug>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <algorithm>
 // === Pin 实现 ===
 Pin::Pin(Component* owner, PinType type, int index) : m_owner(owner), m_type(type), m_index(index), m_state(false) {}
 bool Pin::getState() const { return m_state; }
@@ -46,7 +47,10 @@ QPointF Component::position() const { return m_position; }
 Input::Input(const QPointF& pos) : Component(ComponentType::Input, pos, 0, 1), m_currentState(false) {}
 void Input::evaluate() { if (!m_outputPins.isEmpty()) { m_outputPins[0]->setState(m_currentState); } }
 void Input::toggleState() { m_currentState = !m_currentState; evaluate(); }
-void Input::setState(bool state) { m_currentState = state; }
+void Input::setState(bool state) {
+    m_currentState = state;
+    evaluate(); // <-- 加上这一行！
+}
 
 Output::Output(const QPointF& pos) : Component(ComponentType::Output, pos, 1, 0) {}
 void Output::evaluate() { /* 状态由输入引脚决定 */ }
@@ -93,6 +97,8 @@ Component* Engine::createComponent(ComponentType type, const QPointF& pos) {
     return newComponent;
 }
 
+// in engine.cpp
+
 Component* Engine::createComponent(const QJsonObject& compObject)
 {
     ComponentType type = static_cast<ComponentType>(compObject["type"].toInt());
@@ -101,10 +107,22 @@ Component* Engine::createComponent(const QJsonObject& compObject)
     if (type == ComponentType::Encapsulated) {
         // 如果是封装元件，从 "internal_circuit" 字段获取其定义
         QJsonObject internalJson = compObject["internal_circuit"].toObject();
-        return new EncapsulatedComponent(pos, internalJson);
+        QString name = compObject["name"].toString("封装元件");
+
+        // 1. 创建元件实例
+        Component* newComponent = new EncapsulatedComponent(pos, name, internalJson);
+
+        // 2. 【核心修复】创建后，必须手动将其注册到当前引擎实例中
+        //    这样内部引擎在仿真时才能找到这个嵌套的子元件。
+        if (newComponent) {
+            m_components.insert(reinterpret_cast<intptr_t>(newComponent), newComponent);
+        }
+
+        // 3. 返回创建的实例
+        return newComponent;
     }
 
-    // 对于其他简单元件，调用旧的创建函数
+    // 对于其他简单元件，调用旧的创建函数 (该函数内部已经包含了注册逻辑)
     return createComponent(type, pos);
 }
 
@@ -205,70 +223,21 @@ void Engine::deleteComponent(Component* component) {
 void Engine::deleteWire(Wire* wire) { if (!wire) return; m_wires.removeAll(wire); delete wire; }
 
 // 在 engine.cpp 文件中
+// in engine.cpp
 
 bool Engine::loadCircuitFromJson(const QJsonObject& json)
 {
-    // 关键第一步：在加载新内容前，清空引擎中所有旧的数据
+    // 使命A：清空！
     clearAll();
 
-    // 检查JSON文件是否包含必须的 "components" 数组
-    if (!json.contains("components") || !json["components"].isArray()) {
-        qWarning("JSON load error: 'components' array not found or is not an array.");
-        return false;
+    // 调用底层函数完成加载
+    if (loadCircuitInternal(json)) {
+        // 加载成功后，运行一次仿真以更新所有引脚的初始状态
+        simulate();
+        return true;
     }
 
-    // 1. 反序列化所有元件
-    // 这个Map至关重要，它记录了文件中的旧ID到我们新创建的元件内存地址的映射关系
-    QMap<qint64, Component*> idMap;
-    const QJsonArray componentsArray = json["components"].toArray();
-
-    for (const QJsonValue &compValue : componentsArray) {
-        QJsonObject compObject = compValue.toObject();
-        qint64 id = compObject["id"].toInteger();
-        ComponentType type = static_cast<ComponentType>(compObject["type"].toInt());
-        QPointF pos(compObject["x"].toDouble(), compObject["y"].toDouble());
-
-        // 使用我们已有的工厂函数创建新元件
-        Component* newComponent = createComponent(compObject);
-        if (newComponent) {
-            // 将旧ID和新元件的映射关系存入Map
-            idMap[id] = newComponent;
-        } else {
-            // 如果有任何一个元件创建失败，说明文件有问题，回滚所有操作
-            clearAll();
-            return false;
-        }
-    }
-
-    // 2. 反序列化所有导线
-    if (json.contains("wires") && json["wires"].isArray()) {
-        const QJsonArray wiresArray = json["wires"].toArray();
-        for (const QJsonValue &wireValue : wiresArray) {
-            QJsonObject wireObject = wireValue.toObject();
-            qint64 startCompId = wireObject["start_comp_id"].toInteger();
-            int startPinIndex = wireObject["start_pin_index"].toInt();
-            qint64 endCompId = wireObject["end_comp_id"].toInteger();
-            int endPinIndex = wireObject["end_pin_index"].toInt();
-
-            // 使用idMap，通过旧ID找到我们刚刚创建的新元件
-            Component* startComp = idMap.value(startCompId);
-            Component* endComp = idMap.value(endCompId);
-
-            // 健壮性检查：确保元件和引脚都有效
-            if (!startComp || !endComp || startPinIndex >= startComp->outputPins().size() || endPinIndex >= endComp->inputPins().size()) {
-                clearAll(); // 数据无效，回滚
-                return false;
-            }
-
-            // 创建新的导线并添加到引擎的导线列表中
-            Wire* newWire = new Wire(startComp->outputPins()[startPinIndex], endComp->inputPins()[endPinIndex]);
-            m_wires.append(newWire);
-        }
-    }
-
-    // 加载成功后，运行一次仿真以更新所有引脚的初始状态
-    simulate();
-    return true; // 成功！
+    return false;
 }
 void Engine::clearAll() {
     qDeleteAll(m_wires);
@@ -294,6 +263,7 @@ QJsonObject Engine::saveCircuitToJson() const
         if (comp->type() == ComponentType::Encapsulated) {
             // 如果是封装元件，额外保存其内部电路的JSON定义
             auto encapsulatedComp = static_cast<EncapsulatedComponent*>(comp);
+            compObject["name"] = encapsulatedComp->getName();
             compObject["internal_circuit"] = encapsulatedComp->getInternalJson();
         }
         componentsArray.append(compObject);
@@ -324,14 +294,14 @@ QJsonObject Engine::saveCircuitToJson() const
 // === EncapsulatedComponent 实现
 // ===============================================
 
-EncapsulatedComponent::EncapsulatedComponent(const QPointF& pos, const QJsonObject& internalCircuitJson)
-    // 构造函数调用父类，但输入输出引脚数暂时为0，后面动态计算
+EncapsulatedComponent::EncapsulatedComponent(const QPointF& pos, const QString& name, const QJsonObject& internalCircuitJson)
     : Component(ComponentType::Encapsulated, pos, 0, 0),
     m_internalEngine(new Engine()),
-    m_internalCircuitJson(internalCircuitJson)
+    m_internalCircuitJson(internalCircuitJson),
+    m_name(name)
 {
     // 1. 加载内部电路到迷你引擎
-    m_internalEngine->loadCircuitFromJson(m_internalCircuitJson);
+    m_internalEngine->loadCircuitInternal(m_internalCircuitJson);
 
     // 2. 根据内部电路的 Input/Output 元件，建立引脚映射并创建外部引脚
     buildPinMappings();
@@ -342,20 +312,47 @@ EncapsulatedComponent::~EncapsulatedComponent()
     delete m_internalEngine;
 }
 
+QString EncapsulatedComponent::getName() const
+{
+    return m_name;
+}
+
 void EncapsulatedComponent::buildPinMappings()
 {
-    // 遍历内部引擎的所有元件，寻找 Input 和 Output
+    // --- 1. 先收集所有内部的 Input 和 Output 元件 ---
+    QVector<Component*> internalInputComps;
+    QVector<Component*> internalOutputComps;
+
     for (Component* comp : m_internalEngine->getAllComponents().values()) {
         if (comp->type() == ComponentType::Input) {
-            // 内部的 Input 元件，它的输出就是我们封装体的“输入”
-            m_internalInputs.append(comp->outputPins()[0]);
+            internalInputComps.append(comp);
         } else if (comp->type() == ComponentType::Output) {
-            // 内部的 Output 元件，它的输入就是我们封装体的“输出”
-            m_internalOutputs.append(comp->inputPins()[0]);
+            internalOutputComps.append(comp);
         }
     }
 
-    // 根据找到的内外引脚数量，动态创建自己的引脚
+    // --- 2. 【核心修改】根据 Y 坐标对它们进行排序 ---
+    // C++ Lambda 表达式用于定义一个临时的比较函数
+    std::sort(internalInputComps.begin(), internalInputComps.end(),
+              [](const Component* a, const Component* b) {
+                  return a->position().y() < b->position().y();
+              }
+              );
+    std::sort(internalOutputComps.begin(), internalOutputComps.end(),
+              [](const Component* a, const Component* b) {
+                  return a->position().y() < b->position().y();
+              }
+              );
+
+    // --- 3. 按照排序后的顺序，建立引脚映射 ---
+    for (Component* comp : internalInputComps) {
+        m_internalInputs.append(comp->outputPins()[0]);
+    }
+    for (Component* comp : internalOutputComps) {
+        m_internalOutputs.append(comp->inputPins()[0]);
+    }
+
+    // --- 4. 根据最终的引脚数量，动态创建自己的外部引脚 ---
     for (int i = 0; i < m_internalInputs.size(); ++i) {
         m_inputPins.append(new Pin(this, Pin::Input, i));
     }
@@ -399,4 +396,58 @@ void Engine::registerComponent(Component* component)
     if (component) {
         m_components.insert(reinterpret_cast<intptr_t>(component), component);
     }
+}
+// in engine.cpp
+
+bool Engine::loadCircuitInternal(const QJsonObject& json)
+{
+    // 【核心】没有 clearAll()
+    if (!json.contains("components") || !json["components"].isArray()) {
+        qWarning("JSON load error: 'components' array not found or is not an array.");
+        return false;
+    }
+
+    QMap<qint64, Component*> idMap;
+    const QJsonArray componentsArray = json["components"].toArray();
+
+    for (const QJsonValue &compValue : componentsArray) {
+        QJsonObject compObject = compValue.toObject();
+        qint64 id = compObject["id"].toInteger();
+        Component* newComponent = createComponent(compObject);
+        if (newComponent) {
+            idMap[id] = newComponent;
+        } else {
+            // 清理已创建的元件以防内存泄漏
+            qDeleteAll(m_components.values());
+            m_components.clear();
+            return false;
+        }
+    }
+
+    if (json.contains("wires") && json["wires"].isArray()) {
+        const QJsonArray wiresArray = json["wires"].toArray();
+        for (const QJsonValue &wireValue : wiresArray) {
+            QJsonObject wireObject = wireValue.toObject();
+            qint64 startCompId = wireObject["start_comp_id"].toInteger();
+            int startPinIndex = wireObject["start_pin_index"].toInt();
+            qint64 endCompId = wireObject["end_comp_id"].toInteger();
+            int endPinIndex = wireObject["end_pin_index"].toInt();
+
+            // 使用idMap，通过旧ID找到我们刚刚创建的新元件
+            Component* startComp = idMap.value(startCompId);
+            Component* endComp = idMap.value(endCompId);
+
+            // 健壮性检查：确保元件和引脚都有效
+            if (!startComp || !endComp || startPinIndex >= startComp->outputPins().size() || endPinIndex >= endComp->inputPins().size()) {
+                clearAll(); // 数据无效，回滚
+                return false;
+            }
+
+            // 创建新的导线并添加到引擎的导线列表中
+            Wire* newWire = new Wire(startComp->outputPins()[startPinIndex], endComp->inputPins()[endPinIndex]);
+            m_wires.append(newWire);
+        }
+
+    }
+    return true;
 }

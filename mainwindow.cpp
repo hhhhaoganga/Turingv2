@@ -18,6 +18,7 @@
 #include <QDir>
 #include <QMessageBox>
 #include <QToolBar>
+#include <QMenu>
 /**
  * @file mainwindow.cpp
  * @brief 【C同学负责】实现主窗口的所有功能，已升级为多标签页架构。
@@ -55,6 +56,11 @@ MainWindow::MainWindow(QWidget *parent)
 
 
     // 3. 设置TabWidget的功能
+    ui->toolBar_2->setContextMenuPolicy(Qt::CustomContextMenu);
+
+    // 【新增】将右键点击信号连接到我们新创建的槽函数
+    connect(ui->toolBar_2, &QToolBar::customContextMenuRequested,
+            this, &MainWindow::onCustomComponentToolbarContextMenuRequested);
     connect(ui->tabWidget, &QTabWidget::tabCloseRequested, this, &MainWindow::onTabClose);
     connect(ui->tabWidget, &QTabWidget::currentChanged, this, &MainWindow::onComponentPlaced);
     // 程序启动时，扫描元件库并填充到现有工具栏
@@ -488,7 +494,45 @@ void MainWindow::onCustomComponentActionTriggered()
     }
 
     // 设置场景进入“添加封装元件”模式，并把 JSON 数据传递过去
+    scene->setNameForNextComponent(action->text());
     scene->setMode(GraphicsScene::AddingComponent);
     scene->setComponentTypeToAdd(ComponentType::Encapsulated);
     scene->setJsonForNextComponent(loadDoc.object());
+}
+void MainWindow::onCustomComponentToolbarContextMenuRequested(const QPoint &pos)
+{
+    // 1. 获取在指定位置的 Action (按钮)
+    QAction* action = ui->toolBar_2->actionAt(pos);
+
+    // 2. 检查这个 Action 是否有效，以及它是不是一个我们标记过的自定义元件
+    if (action && action->property("isCustom").toBool()) {
+        // 创建一个上下文菜单
+        QMenu contextMenu(this);
+        QAction *deleteAction = contextMenu.addAction("从库中删除");
+
+        // 弹出菜单，并等待用户操作
+        QAction *selectedAction = contextMenu.exec(ui->toolBar_2->mapToGlobal(pos));
+
+        // 3. 如果用户点击了“删除”
+        if (selectedAction == deleteAction) {
+            // 弹出确认对话框
+            QMessageBox::StandardButton reply;
+            reply = QMessageBox::question(this, "确认删除",
+                                          QString("你确定要永久删除元件 '%1' 吗？\n这个操作无法撤销。").arg(action->text()),
+                                          QMessageBox::Yes | QMessageBox::No);
+
+            if (reply == QMessageBox::Yes) {
+                // 4. 从 Action 中获取文件路径并执行删除
+                QString filePath = action->data().toString();
+                QFile file(filePath);
+                if (file.remove()) {
+                    ui->statusbar->showMessage(QString("元件 '%1' 已成功删除。").arg(action->text()), 3000);
+                    // 5. 【关键】调用刷新函数，UI 上的按钮就会消失
+                    populateCustomComponentToolbar();
+                } else {
+                    QMessageBox::critical(this, "删除失败", "无法从硬盘删除文件，请检查文件权限。");
+                }
+            }
+        }
+    }
 }

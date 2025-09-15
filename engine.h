@@ -10,7 +10,7 @@ class Pin;
 class Component;
 class Wire;
 class ComponentItem;
-
+class EncapsulatedComponent;
 // ===============================================
 // 枚举与类的定义 (严格按照成熟版本)
 // ===============================================
@@ -103,13 +103,15 @@ public:
     void registerComponent(Component* component);
     QJsonObject saveCircuitToJson() const;
     QJsonObject saveComponentsToJson(const QVector<Component*>& components) const;
+    friend class EncapsulatedComponent;
 private:
     QMap<intptr_t, Component*> m_components;
     QVector<Wire*> m_wires;
+    bool loadCircuitInternal(const QJsonObject& json);
 };
 class EncapsulatedComponent : public Component {
 public:
-    EncapsulatedComponent(const QPointF& pos, const QJsonObject& internalCircuitJson);
+    EncapsulatedComponent(const QPointF& pos, const QString& name, const QJsonObject& internalCircuitJson);
     ~EncapsulatedComponent() override;
 
     // 核心评估函数
@@ -118,6 +120,8 @@ public:
     // 用于保存/加载
     const QJsonObject& getInternalJson() const;
 
+    QString getName() const;
+
 private:
     void buildPinMappings();
 
@@ -125,6 +129,8 @@ private:
     Engine* m_internalEngine;
     // 保存内部电路的定义，用于序列化
     QJsonObject m_internalCircuitJson;
+    // 【新增】成员变量来存储名字
+    QString m_name;
 
     // 外部引脚到内部引脚的映射
     QVector<Pin*> m_internalInputs;  // 指向内部 Input 元件的输出引脚

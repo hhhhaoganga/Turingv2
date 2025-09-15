@@ -57,6 +57,9 @@ private slots:
 
     void onCustomComponentActionTriggered();
 
+    // 【新增】这个槽函数将用于响应在工具栏上的右键点击
+    void onCustomComponentToolbarContextMenuRequested(const QPoint &pos);
+
 private:
     Ui::MainWindow *ui;
 
