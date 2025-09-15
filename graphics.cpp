@@ -303,6 +303,8 @@ void GraphicsScene::mouseMoveEvent(QGraphicsSceneMouseEvent *event) {
     }
 }
 
+// 找到 GraphicsScene::mouseReleaseEvent 函数
+
 void GraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event) {
     if (m_tempLine) {
         removeItem(m_tempLine);
@@ -310,17 +312,28 @@ void GraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event) {
         m_tempLine = nullptr;
 
         ComponentItem* endCompItem = qgraphicsitem_cast<ComponentItem*>(itemAt(event->scenePos(), QTransform()));
+
+        // 【核心修改】
+        // 旧逻辑: if (endCompItem) { ... }
+        // 新逻辑: 先判断是否点中了元件，再判断是否点中了引脚
         if (endCompItem) {
             Pin* endPin = endCompItem->getPinAt(endCompItem->mapFromScene(event->scenePos()));
-            Wire* newWireData = m_engine->createWire(m_startPin, endPin);
-            if(newWireData){
-                WireItem* wireItem = new WireItem(newWireData);
-                addItem(wireItem);
-                wireItem->updatePosition();
-                m_engine->simulate();
-                update();
+
+            // 只有当终点确实是一个有效的引脚时，才尝试创建导线
+            if (endPin) {
+                Wire* newWireData = m_engine->createWire(m_startPin, endPin);
+                if(newWireData){
+                    WireItem* wireItem = new WireItem(newWireData);
+                    addItem(wireItem);
+                    wireItem->updatePosition();
+                    m_engine->simulate();
+                    update();
+                }
             }
+            // 如果 endPin 是 nullptr (即点在了元件上但不是引脚)，则什么也不做，静默失败。
         }
+        // 如果 endCompItem 是 nullptr (即点在了空白处)，也什么都不做，静默失败。
+
         m_startPin = nullptr;
         return;
     }
