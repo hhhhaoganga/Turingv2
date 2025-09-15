@@ -51,6 +51,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 3. 设置TabWidget的功能
     connect(ui->tabWidget, &QTabWidget::tabCloseRequested, this, &MainWindow::onTabClose);
+    connect(ui->tabWidget, &QTabWidget::currentChanged, this, &MainWindow::onComponentPlaced);
 
     // 4. 启动时自动创建一个空白标签页
     onNewTab();
@@ -278,36 +279,25 @@ void MainWindow::on_actionSave_triggered()
 }
 
 
+// ... (其他函数保持不变) ...
+
 void MainWindow::on_actionOpen_triggered()
 {
-    // 询问用户是否要保存当前活动标签页的修改（这是一个好的实践）
-    QMessageBox::StandardButton reply;
-    reply = QMessageBox::question(this,
-                                  "确认操作",
-                                  "打开一个新文件将会替换当前标签页的电路，是否要先保存当前修改？",
-                                  QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
-
-    if (reply == QMessageBox::Cancel) {
-        ui->statusbar->showMessage("打开操作已取消", 3000);
-        return;
-    }
-    if (reply == QMessageBox::Save) {
-        on_actionSave_triggered();
-    }
-
-    // 打开文件对话框
+    // 1. 打开文件对话框，让用户选择文件
     QString filePath = QFileDialog::getOpenFileName(
         this,
         "打开电路文件",
         "", // 默认目录
         "JSON 文件 (*.json);;所有文件 (*.*)"
         );
+
+    // 如果用户取消了选择，直接返回
     if (filePath.isEmpty()) {
         ui->statusbar->showMessage("打开操作已取消", 3000);
         return;
     }
 
-    // 读取文件
+    // 2. 读取文件内容
     QFile loadFile(filePath);
     if (!loadFile.open(QIODevice::ReadOnly)) {
         QMessageBox::critical(this, "打开错误", "无法打开文件进行读取！");
@@ -316,7 +306,7 @@ void MainWindow::on_actionOpen_triggered()
     QByteArray fileData = loadFile.readAll();
     loadFile.close();
 
-    // 解析JSON
+    // 3. 解析JSON数据
     QJsonDocument loadDoc = QJsonDocument::fromJson(fileData);
     if (loadDoc.isNull() || !loadDoc.isObject()) {
         QMessageBox::critical(this, "解析错误", "文件不是一个有效的JSON对象！");
@@ -324,30 +314,42 @@ void MainWindow::on_actionOpen_triggered()
     }
     QJsonObject circuitJson = loadDoc.object();
 
-    // 获取当前引擎和场景，准备加载数据
+    // 4. 【核心修改】创建一个新的标签页用于承载打开的文件
+    onNewTab();
+
+    // 5. 获取这个刚刚创建的新标签页的 Engine 和 Scene
     Engine* engine = currentEngine();
     GraphicsScene* scene = currentScene();
+
+    // 健壮性检查，虽然 onNewTab 之后这里应该总是有值的
     if (!engine || !scene) {
-        // 如果没有活动标签页（虽然不太可能发生），就新建一个
-        onNewTab();
-        engine = currentEngine();
-        scene = currentScene();
+        QMessageBox::critical(this, "内部错误", "无法创建新的画布来加载文件。");
+        // 关闭刚刚创建的空标签页
+        onTabClose(ui->tabWidget->currentIndex());
+        return;
     }
 
-    // 调用引擎的加载功能
+    // 6. 调用引擎的加载功能，将JSON数据加载到新引擎中
     if (engine->loadCircuitFromJson(circuitJson)) {
-        // 如果后台引擎成功加载了数据...
-        // 命令前台画布根据引擎的新状态重绘
+        // 如果后台引擎成功加载...
+        // ...命令前台画布根据引擎的新状态重绘
         scene->rebuildSceneFromEngine();
+
+        // 7. 【体验优化】将新标签页的标题设置为文件名
+        QString fileName = QFileInfo(filePath).fileName();
+        ui->tabWidget->setTabText(ui->tabWidget->currentIndex(), fileName);
+
         // 给出成功反馈
-        ui->statusbar->showMessage("电路已成功从 " + filePath + " 加载", 5000);
+        ui->statusbar->showMessage("电路已成功从 " + filePath + " 加载到新画布", 5000);
 
     } else {
-        // 返回false，说明加载失败
+        // 如果加载失败，给出提示并关闭刚刚创建的空标签页
         QMessageBox::critical(this, "加载失败", "文件内容格式错误或数据不兼容，无法加载。");
+        onTabClose(ui->tabWidget->currentIndex());
     }
 }
 
+// ... (其他函数保持不变) ...
 // 封装功能的占位符，将在下一步实现
 void MainWindow::on_actionEncapsulate_triggered()
 {

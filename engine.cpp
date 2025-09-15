@@ -171,7 +171,21 @@ void Engine::simulate()
 }
 const QMap<intptr_t, Component*>& Engine::getAllComponents() const { return m_components; }
 const QVector<Wire*>& Engine::getAllWires() const { return m_wires; }
-void Engine::deleteComponent(Component* component) { /* ... */ } // 省略删除逻辑，保持B同学文件独立
+
+void Engine::deleteComponent(Component* component) {
+    if (!component) {
+        return; // 如果传入的是空指针，直接返回
+    }
+
+    // 1. 使用元件的内存地址作为键，在 m_components 中查找并移除它
+    //    reinterpret_cast 用于将指针转换为整数类型的键
+    intptr_t componentKey = reinterpret_cast<intptr_t>(component);
+    if (m_components.remove(componentKey)) {
+        // 2. 如果成功移除了键值对，说明元件确实存在于Map中，
+        //    现在可以安全地释放它占用的内存了
+        delete component;
+    }
+}
 void Engine::deleteWire(Wire* wire) { if (!wire) return; m_wires.removeAll(wire); delete wire; }
 
 // 在 engine.cpp 文件中
