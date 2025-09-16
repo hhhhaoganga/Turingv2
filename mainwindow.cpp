@@ -37,6 +37,8 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
+    setWindowTitle("逻辑链成");
+
     // 1. 清空UI编辑器为预览而生成的占位符Tab页
     while (ui->tabWidget->count() > 0) {
         ui->tabWidget->removeTab(0);
@@ -114,7 +116,23 @@ void MainWindow::onNewTab()
 
     // 2. 将 Scene 安装到一个 QGraphicsView 中
     QGraphicsView* view = new QGraphicsView(scene);
-    view->setRenderHint(QPainter::Antialiasing); // 让视图渲染更平滑，观感更好
+
+    // =============================================================
+    // == 【核心修改】在这里添加导航和滚动条的配置
+    // =============================================================
+
+    // a. 设置渲染提示，让图形和文字更平滑
+    view->setRenderHint(QPainter::Antialiasing);
+
+    // b. 设置滚动条策略为“按需显示”
+    //    当场景内容超出视图范围时，滚动条会自动出现。
+    view->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    view->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+
+    // d. 确保支持鼠标滚轮缩放 (这是默认行为，但明确设置可以避免意外)
+    //    用户可以按住 Ctrl 键并滚动鼠标滚轮来缩放视图。
+    view->setTransformationAnchor(QGraphicsView::AnchorUnderMouse); // 以鼠标为中心进行缩放
+    view->setResizeAnchor(QGraphicsView::AnchorViewCenter);
 
     // 3. 把这个 view 添加为一个新的标签页
     QString tabName = QString("电路 %1").arg(ui->tabWidget->count() + 1);
