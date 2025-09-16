@@ -183,8 +183,10 @@ Component* Engine::createComponent(const QJsonObject& compObject)
  * @return 创建成功返回新导线指针，失败返回nullptr
  */
 Wire* Engine::createWire(Pin* startPin, Pin* endPin) {
-    if (!startPin || !endPin || startPin->owner() == endPin->owner() || startPin->type() == endPin->type()) {
-        QMessageBox::warning(nullptr, "非法连接", "不能连接到自身或同类型引脚。");
+    // 【修改】移除了 startPin->owner() == endPin->owner() 的检查
+    if (!startPin || !endPin || startPin->type() == endPin->type()) {
+        // 【修改】更新了提示信息，不再提及“自身”
+        QMessageBox::warning(nullptr, "非法连接", "不能连接同类型的引脚。");
         return nullptr;
     }
     if (startPin->type() == Pin::Input) { std::swap(startPin, endPin); }

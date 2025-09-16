@@ -33,7 +33,10 @@ void ComponentItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opt
 
     // 绘制主体
     painter->setPen(QPen(Qt::darkGray, 2));
-    painter->setBrush(QColor("#f0f0f0"));
+    // 【修改】将画刷颜色设置为半透明
+    QColor bodyColor("#f0f0f0");
+    bodyColor.setAlphaF(0.85); // 设置为85%不透明度，允许下方导线透出
+    painter->setBrush(bodyColor);
     painter->drawRoundedRect(bodyRect, 5, 5);
 
     // 绘制选中状态

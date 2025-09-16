@@ -310,7 +310,7 @@ void MainWindow::on_actionSave_triggered()
 }
 
 
-// ... (其他函数保持不变) ...
+
 
 /** 打开JSON文件到新标签页，并重建场景 */
 void MainWindow::on_actionOpen_triggered()
@@ -368,7 +368,8 @@ void MainWindow::on_actionOpen_triggered()
         scene->rebuildSceneFromEngine();
 
         // 7. 【体验优化】将新标签页的标题设置为文件名
-        QString fileName = QFileInfo(filePath).fileName();
+        // 【修改】使用 baseName() 替代 fileName() 来移除后缀
+        QString fileName = QFileInfo(filePath).baseName();
         ui->tabWidget->setTabText(ui->tabWidget->currentIndex(), fileName);
 
         // 给出成功反馈
