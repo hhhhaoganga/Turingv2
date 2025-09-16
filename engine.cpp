@@ -22,11 +22,35 @@ Component* Pin::owner() const { return m_owner; }
 Pin::PinType Pin::type() const { return m_type; }
 /** 获取引脚索引 */
 int Pin::index() const { return m_index; }
+
 /** 计算并返回场景坐标中的引脚位置 */
 QPointF Pin::getScenePos() const {
     if (m_owner && m_owner->getGraphicsItem()) {
-        int pinCount = (m_type == Input) ? m_owner->inputPins().size() : m_owner->outputPins().size();
-        qreal yPos = 50.0 * (m_index + 1) / (pinCount + 1);
+        // =============================================================
+        // == 【核心修改】在这里加入与 ComponentItem 中完全相同的动态高度计算逻辑
+        // =============================================================
+
+        // 1. 从所属元件获取输入/输出引脚的总数
+        int numInputs = m_owner->inputPins().size();
+        int numOutputs = m_owner->outputPins().size();
+        int maxPins = qMax(numInputs, numOutputs);
+
+        // 2. 根据最大引脚数，动态计算元件的理论高度
+        qreal bodyHeight = 50.0; // 默认高度
+        if (maxPins > 4) {
+            // 使用与 ComponentItem::paint() 中完全相同的公式
+            bodyHeight = 10.0 * (maxPins + 1);
+        }
+
+        // =============================================================
+        // == 修改结束
+        // =============================================================
+
+        // 3. 使用这个动态计算出的 bodyHeight 来确定引脚的 Y 坐标
+        int pinCount = (m_type == Input) ? numInputs : numOutputs;
+        qreal yPos = bodyHeight * (m_index + 1) / (pinCount + 1); // <-- 将 50.0 替换为 bodyHeight
+
+        // 4. 剩下的逻辑保持不变
         QPointF localPos = (m_type == Input) ? QPointF(0, yPos) : QPointF(100, yPos);
         return m_owner->getGraphicsItem()->mapToScene(localPos);
     }

@@ -21,21 +21,45 @@ ComponentItem::ComponentItem(Component* data) : m_componentData(data) {
 }
 
 /** 返回组件的包围盒 */
+/** 返回组件的包围盒 */
 QRectF ComponentItem::boundingRect() const {
-    return QRectF(-10, -10, 120, 70); // 扩展边界以容纳引脚
+    // 【修改】动态计算高度
+    int numInputs = m_componentData->inputPins().size();
+    int numOutputs = m_componentData->outputPins().size();
+    int maxPins = qMax(numInputs, numOutputs); // 使用 qMax 获取输入和输出引脚数中的较大值
+
+    qreal bodyHeight = 50.0; // 默认高度
+    if (maxPins > 4) {
+        // 当引脚超过4个时，我们希望保持4个引脚时的间距。
+        // 4个引脚时的间距是 50 / (4 + 1) = 10。
+        // 所以新高度 = 间距 * (新引脚数 + 1)
+        bodyHeight = 10.0 * (maxPins + 1);
+    }
+
+    // 返回一个能容纳新高度的包围盒，上下各留10像素的边距
+    return QRectF(-10, -10, 120, bodyHeight + 20);
 }
 
 /** 绘制组件主体、文字、引脚与选中高亮效果 */
 void ComponentItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
 {
-    QRectF bodyRect(0, 0, 100, 50);
+    int numInputs = m_componentData->inputPins().size();
+    int numOutputs = m_componentData->outputPins().size();
+    int maxPins = qMax(numInputs, numOutputs);
+
+    qreal bodyHeight = 50.0;
+    if (maxPins > 4) {
+        bodyHeight = 10.0 * (maxPins + 1);
+    }
+
+    // 使用动态计算的高度来定义元件主体的矩形
+    QRectF bodyRect(0, 0, 100, bodyHeight);
     painter->setRenderHint(QPainter::Antialiasing);
 
     // 绘制主体
     painter->setPen(QPen(Qt::darkGray, 2));
-    // 【修改】将画刷颜色设置为半透明
     QColor bodyColor("#f0f0f0");
-    bodyColor.setAlphaF(0.85); // 设置为85%不透明度，允许下方导线透出
+    bodyColor.setAlphaF(0.85);
     painter->setBrush(bodyColor);
     painter->drawRoundedRect(bodyRect, 5, 5);
 
@@ -114,14 +138,12 @@ void ComponentItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opt
     }
 
     // 绘制引脚
-    int numInputs = m_componentData->inputPins().size();
     for (int i = 0; i < numInputs; ++i) {
         qreal yPos = bodyRect.height() * (i + 1) / (numInputs + 1);
         painter->setBrush(m_componentData->inputPins()[i]->getState() ? Qt::green : Qt::darkGray);
         painter->drawEllipse(QPointF(0, yPos), 4, 4);
     }
 
-    int numOutputs = m_componentData->outputPins().size();
     for (int i = 0; i < numOutputs; ++i) {
         qreal yPos = bodyRect.height() * (i + 1) / (numOutputs + 1);
         painter->setBrush(m_componentData->outputPins()[i]->getState() ? Qt::green : Qt::darkGray);
@@ -135,22 +157,33 @@ Component* ComponentItem::component() const {
 }
 
 /** 根据局部坐标命中检测，返回被击中的引脚 */
+/** 根据局部坐标命中检测，返回被击中的引脚 */
 Pin* ComponentItem::getPinAt(const QPointF &localPos) {
     const qreal pinRadius = 4.0;
     const qreal clickableRadius = pinRadius * 2;
 
+    // 【修改】再次使用相同的逻辑计算元件高度
     int numInputs = m_componentData->inputPins().size();
+    int numOutputs = m_componentData->outputPins().size();
+    int maxPins = qMax(numInputs, numOutputs);
+
+    qreal bodyHeight = 50.0;
+    if (maxPins > 4) {
+        bodyHeight = 10.0 * (maxPins + 1);
+    }
+
     for(int i = 0; i < numInputs; ++i) {
-        qreal yPos = 50.0 * (i + 1) / (numInputs + 1);
+        // 使用动态高度 bodyHeight 替代硬编码的 50.0
+        qreal yPos = bodyHeight * (i + 1) / (numInputs + 1);
         QRectF pinArea(QPointF(-clickableRadius/2, yPos - clickableRadius/2), QSizeF(clickableRadius, clickableRadius));
         if (pinArea.contains(localPos)) {
             return m_componentData->inputPins()[i];
         }
     }
 
-    int numOutputs = m_componentData->outputPins().size();
     for(int i = 0; i < numOutputs; ++i) {
-        qreal yPos = 50.0 * (i + 1) / (numOutputs + 1);
+        // 使用动态高度 bodyHeight 替代硬编码的 50.0
+        qreal yPos = bodyHeight * (i + 1) / (numOutputs + 1);
         QRectF pinArea(QPointF(100 - clickableRadius/2, yPos - clickableRadius/2), QSizeF(clickableRadius, clickableRadius));
         if (pinArea.contains(localPos)) {
             return m_componentData->outputPins()[i];
@@ -158,7 +191,6 @@ Pin* ComponentItem::getPinAt(const QPointF &localPos) {
     }
     return nullptr;
 }
-
 /** 捕获位置变化，将位置同步回后端数据 */
 QVariant ComponentItem::itemChange(GraphicsItemChange change, const QVariant &value) {
     if (change == ItemPositionHasChanged && m_componentData) {
